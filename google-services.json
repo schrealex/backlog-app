@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "508976850707",
+    "project_id": "backlog-app-795c4",
+    "storage_bucket": "backlog-app-795c4.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:508976850707:android:5dbd198f5d9cb66b159ce6",
+        "android_client_info": {
+          "package_name": "com.ce_real.backlogapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "508976850707-uhbo4rpqdvuj4h5v7r5kpva3rb44jvo9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAT0aBrP2IqwabsPLSOZ-q8z7zHaz4QfkQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "508976850707-uhbo4rpqdvuj4h5v7r5kpva3rb44jvo9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
