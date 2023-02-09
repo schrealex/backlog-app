@@ -8,12 +8,16 @@ import { RootTabScreenProps } from '../types';
 import { Game } from '../types/Game';
 import { completion, FULL_GAMES_LIST, gameCopy } from '../constants/FULL_GAMES_LIST';
 
+import { addDoc, collection, getDocs, query, where } from 'firebase/firestore/lite';
+import { Firestore } from 'firebase/firestore';
+import { firestore } from '../firebaseConfig';
+
 const sortProperty = {
     ALPHABETICAL: 'Alphabetical',
     HLTB: 'Hltb'
 };
 
-function ButtonContent({ sortBy, sortAscending }) {
+function ButtonContent({ sortBy, sortAscending }: any) {
     return (
         <View style={styles.buttonContent}>
             {sortBy === sortProperty.ALPHABETICAL && sortAscending ?
@@ -40,16 +44,43 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
     useEffect(() => {
         let mounted = true;
 
+        async function getGames(fs: Firestore) {
+            const fullGamesList = collection(fs, 'full-games-list');
+            const whereQuery = query(fullGamesList, where('completion', 'not-in', ['Beaten', 'Completed', 'Continuous', 'Dropped']));
+            const fullGamesListSnapshot = await getDocs(whereQuery);
+            return fullGamesListSnapshot.docs.map(doc => doc.data());
+        }
+
+
+        async function updateWishList(fs: any) {
+            // const wishlist = collection(fs, 'wish-list-games');
+            const fullGamesList = collection(fs, 'full-games-list');
+            await FULL_GAMES_LIST.forEach(game => {
+                addDoc(fullGamesList, game).then(r => {
+                    console.log({ r });
+                }).catch(error => {
+                    console.log(error);
+                });
+            });
+        }
+
+        // updateWishList(firestore).then(result => {
+        //     console.log({ result });
+        // }).catch(error => {
+        //     console.log(error);
+        // });
+
         async function getFullList() {
-            const backlog: Array<Game> = FULL_GAMES_LIST.filter((game: Game) => !(
-                game.completion === completion.BEATEN ||
-                game.completion === completion.COMPLETED ||
-                game.completion === completion.DROPPED ||
-                game.completion === completion.CONTINUOUS
-            ));
-            setFullBacklog(backlog);
-            setBacklogData(backlog);
-            setIsLoading(false);
+
+            getGames(firestore).then(result => {
+                const backlog: Array<any> = result.sort((a: any, b: any) => {
+                    return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
+                        b.title.toLowerCase().localeCompare(a.title.toLowerCase());
+                });
+                setFullBacklog(backlog);
+                setBacklogData(backlog);
+                setIsLoading(false);
+            });
         }
 
         if (mounted) {
@@ -60,6 +91,14 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
             mounted = false;
         };
     }, []);
+
+    useEffect(() => {
+        if (sortBy === sortProperty.ALPHABETICAL) {
+            sortAlphabetical();
+        } else if (sortBy === sortProperty.HLTB) {
+            sortByHLTB();
+        }
+    }, [sortBy, sortAscending]);
 
     const isAll = () => {
         setBacklogData(getAll());
@@ -105,27 +144,22 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         if (sortBy === sortProperty.ALPHABETICAL && sortAscending) {
             setSortBy(sortProperty.ALPHABETICAL);
             setSortAscending(false);
-            sortAlphabetical();
         } else if (sortBy === sortProperty.ALPHABETICAL && !sortAscending) {
             setSortBy(sortProperty.HLTB);
             setSortAscending(true);
-            sortByHLTB();
         } else if (sortBy === sortProperty.HLTB && sortAscending) {
             setSortBy(sortProperty.HLTB);
             setSortAscending(false);
-            sortByHLTB();
         } else if (sortBy === sortProperty.HLTB && !sortAscending) {
             setSortBy(sortProperty.ALPHABETICAL);
             setSortAscending(true);
-            sortAlphabetical();
         }
     };
 
     const sortAlphabetical = () => {
-
         const sortedList = [...backlogData].sort((a: any, b: any) => {
-            return sortAscending ? b.title.toLowerCase().localeCompare(a.title.toLowerCase()) :
-                a.title.toLowerCase().localeCompare(b.title.toLowerCase());
+            return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
+                b.title.toLowerCase().localeCompare(a.title.toLowerCase());
         });
         setBacklogData(sortedList);
     };
@@ -134,7 +168,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         const sortedList = [...backlogData].sort((a: any, b: any) => {
             if (a.hltbInfo && b.hltbInfo) {
                 if (a.hltbInfo.comp_main && b.hltbInfo.comp_main) {
-                    return !sortAscending ? a.hltbInfo.comp_main - b.hltbInfo.comp_main :
+                    return sortAscending ? a.hltbInfo.comp_main - b.hltbInfo.comp_main :
                         b.hltbInfo.comp_main - a.hltbInfo.comp_main;
                 }
                 return (a.hltbInfo.comp_main && !b.hltbInfo.comp_main) ? -1 : (!a.hltbInfo.comp_main && b.hltbInfo.comp_main) ? 1 : 0;
@@ -148,7 +182,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         <View style={styles.container}>
             <View style={styles.buttonGroup}>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, styles.largeButton]} onPress={toggleSort}>
-                    <ButtonContent sortBy={sortBy} sortAscending={sortAscending}></ButtonContent>
+                    <ButtonContent sortBy={sortBy} sortAscending={sortAscending} />
                 </Pressable>
             </View>
             <View style={styles.buttonGroup}>
@@ -156,7 +190,6 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
                     <Text style={styles.buttonText}>All [{getAll().length}]</Text>
                 </Pressable>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPhysical}>
-                    {/*<Pressable onPress={isPhysical} style={styles.button}>*/}
                     <FontAwesome5 name="compact-disc" size={20} color="red" style={{ paddingRight: 5 }} />
                     <Text style={styles.buttonText}>[{getOnlyPhysical().length}]</Text>
                 </Pressable>
@@ -172,28 +205,13 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
                     <FontAwesome5 name="pause" size={20} color="red" style={{ paddingRight: 5 }} /><Text
                     style={styles.buttonText}>[{getPaused().length}]</Text>
                 </Pressable>
-                {/*<Button*/}
-                {/*    icon={*/}
-                {/*        <FontAwesomeIcon icon={faStopIcon} color={'red'} size={20} style={{ paddingRight: 5 }} />*/}
-                {/*    }*/}
-                {/*    title={getNotStarted().length}*/}
-                {/*    onPress={isNotStarted}*/}
-                {/*    buttonStyle={styles.button}*/}
-                {/*/>*/}
-                {/*<Button*/}
-                {/*    icon={*/}
-                {/*        <FontAwesomeIcon icon={faRepeatAltIcon} color={'red'} size={20} style={{ paddingRight: 5 }} />*/}
-                {/*    }*/}
-                {/*    title={getContinuous().length}*/}
-                {/*    onPress={isContinuous}*/}
-                {/*    buttonStyle={styles.button}*/}
-                {/*/>*/}
             </View>
             {isLoading ?
                 <ActivityIndicator size="large" color="#fff" /> :
                 <FlatList
                     data={backlogData}
                     keyExtractor={(item => item.id.toString())}
+                    style={styles.list}
                     renderItem={({ item }) => (
                         <ListItem item={item} type={'BACKLOG'} />
                     )}
@@ -209,17 +227,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         flex: 1,
     },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-    },
-    item: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 10,
-        fontSize: 16,
-        width: 'min-content',
+    list: {
+        paddingBottom: 100,
     },
     buttonGroup: {
         display: 'flex',

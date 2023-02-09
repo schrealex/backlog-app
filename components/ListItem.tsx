@@ -5,7 +5,37 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { Text, View } from './Themed';
 import { Game } from '../types/Game';
 import { HLTBInfo } from '../types/HLTBInfo';
-import { completion } from '../constants/FULL_GAMES_LIST';
+import { completion, gameCopy } from '../constants/FULL_GAMES_LIST';
+
+function CompletionElement({ completionStatus }: { completionStatus: string }) {
+    return (
+        <View style={styles.completion}>
+            {completionStatus === completion.COMPLETED ? <FontAwesome5 name="trophy" size={20} color="red" /> : null}
+            {completionStatus === completion.BEATEN ? <FontAwesome5 name="fist-raised" size={20} color="red" /> : null}
+            {completionStatus == completion.UNFINISHED ? <FontAwesome5 name="gamepad" size={20} color="red" /> : null}
+            {completionStatus === completion.PAUSED ? <FontAwesome5 name="pause" size={20} color="red" /> : null}
+            {completionStatus === completion.NOT_STARTED ? <FontAwesome5 name="stop" size={20} color="red" /> : null}
+            {completionStatus === completion.DROPPED ? <FontAwesome5 name="times" size={20} color="red" /> : null}
+            {completionStatus === completion.CONTINUOUS ? <FontAwesome5 name="recycle" size={20} color="red" /> : null}
+        </View>
+    );
+}
+
+function GameCopyElement({ gameCopyType }: { gameCopyType: Array<string> }) {
+    return (
+        <View style={styles.gameCopy}>
+            {gameCopyType.includes(gameCopy.PHYSICAL) && gameCopyType.includes(gameCopy.DIGITAL) ?
+                <View style={styles.gameCopyBoth}>
+                    <FontAwesome5 name="compact-disc" size={20} color="red" />
+                    <FontAwesome5 name="hdd" size={20} color="red" />
+                </View>
+                : gameCopyType.includes(gameCopy.PHYSICAL) ?
+                    <FontAwesome5 name="compact-disc" size={20} color="red" /> :
+                    <FontAwesome5 name="hdd" size={20} color="red" />
+            }
+        </View>
+    );
+}
 
 export default function ListItem({ item, type }: { item: Game, type: string }) {
 
@@ -81,7 +111,7 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
     };
 
 
-    const getPlayTimeInHoursAndMinutes = (gameTime) => {
+    const getPlayTimeInHoursAndMinutes = (gameTime: number) => {
         const gameTimeInHours = gameTime / 3600;
         const roundedToSingleDecimal = Math.round(gameTimeInHours * 10) / 10;
         const roundedToHalfOrWholeNumbers = Math.round(roundedToSingleDecimal / 0.5) * 0.5;
@@ -93,15 +123,12 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
                 isLoading ? <ActivityIndicator style={styles.loading} size="large" color="#fff" /> :
                     <View style={styles.item}>
                         <Image source={{ uri: item.image, }} style={{ width: 272, height: 153, resizeMode: 'contain' }} />
-                        <View style={type === 'BACKLOG' ? styles.line : styles.inline}>
-                            {type === 'FULL-LIST' ?
-                                <View style={styles.completion}>
-                                    {item.completion === completion.COMPLETED ? <FontAwesome5 name="trophy" size={20} color="red" /> : null}
-                                    {item.completion === completion.BEATEN ? <FontAwesome5 name="fist-raised" size={20} color="red" /> : null}
-                                    {item.completion === completion.DROPPED ? <FontAwesome5 name="times" size={20} color="red" /> : null}
-                                </View> : null
-                            }
-                            <Text>{item.title}</Text>
+                        <View style={styles.line}>
+                            <View style={styles.inline}>
+                                <CompletionElement completionStatus={item.completion} />
+                                <Text>{item.title}</Text>
+                                <GameCopyElement gameCopyType={item.gameCopy} />
+                            </View>
                             {type === 'BACKLOG' ? (<View>
                                 {
                                     item.hltbInfo && (item.hltbInfo.comp_main > 0 || item.hltbInfo.comp_plus > 0) ? (
@@ -158,7 +185,6 @@ const styles = StyleSheet.create({
         flexWrap: 'nowrap',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '80%',
         marginTop: 8,
     },
     inline: {
@@ -166,7 +192,6 @@ const styles = StyleSheet.create({
         flexWrap: 'nowrap',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '80%',
         marginTop: 8,
     },
     title: {

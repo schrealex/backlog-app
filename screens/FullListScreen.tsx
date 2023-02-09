@@ -10,7 +10,7 @@ const sortProperty = {
     ALPHABETICAL: 'Alphabetical'
 };
 
-function ButtonContent({ sortBy, sortAscending }) {
+function ButtonContent({ sortBy, sortAscending }: any) {
     return (
         <View style={styles.buttonContent}>
             {sortBy === sortProperty.ALPHABETICAL && sortAscending ?
@@ -121,7 +121,7 @@ export default function FullListScreen() {
         <View style={styles.container}>
             <View style={styles.buttonGroup}>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, styles.largeButton]} onPress={toggleSort}>
-                    <ButtonContent sortBy={sortBy} sortAscending={sortAscending}></ButtonContent>
+                    <ButtonContent sortBy={sortBy} sortAscending={sortAscending} />
                 </Pressable>
             </View>
             <View style={styles.buttonGroup}>
