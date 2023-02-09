@@ -25,6 +25,11 @@ const linking: LinkingOptions<RootStackParamList> = {
                             FullListScreen: 'Full list',
                         },
                     },
+                    RetroBacklog: {
+                        screens: {
+                            RetroBacklogScreen: 'Retro backlog',
+                        },
+                    },
                 },
             },
             Modal: 'modal',

@@ -122,7 +122,12 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
             {
                 isLoading ? <ActivityIndicator style={styles.loading} size="large" color="#fff" /> :
                     <View style={styles.item}>
-                        <Image source={{ uri: item.image, }} style={{ width: 272, height: 153, resizeMode: 'contain' }} />
+                        {item.image ?
+                            <Image source={{ uri: item.image, }} style={{ width: 272, height: 153, resizeMode: 'contain' }} /> :
+                            (item.hltbInfo ?
+                                <Image source={{ uri: 'https://howlongtobeat.com/games/' + item.hltbInfo.game_image, }}
+                                       style={{ width: 272, height: 153, resizeMode: 'contain' }} /> : null)
+                        }
                         <View style={styles.line}>
                             <View style={styles.inline}>
                                 <CompletionElement completionStatus={item.completion} />

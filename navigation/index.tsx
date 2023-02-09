@@ -18,6 +18,7 @@ import BacklogScreen from '../screens/BacklogScreen';
 import FullListScreen from '../screens/FullListScreen';
 import { RootStackParamList, RootTabParamList, RootTabScreenProps } from '../types';
 import LinkingConfiguration from './LinkingConfiguration';
+import RetroBacklogScreen from '../screens/RetroBacklogScreen';
 
 export default function Navigation({ colorScheme }: { colorScheme: ColorSchemeName }) {
     return (
@@ -90,6 +91,14 @@ function BottomTabNavigator() {
                 options={{
                     title: 'Full list',
                     tabBarIcon: ({ color }) => <FontAwesome5 name="list" color={color} size={25} />,
+                }}
+            />
+            <BottomTab.Screen
+                name="RetroBacklog"
+                component={RetroBacklogScreen}
+                options={{
+                    title: 'Retro Backlog',
+                    tabBarIcon: ({ color }) => <FontAwesome5 name="history" color={color} size={25} />,
                 }}
             />
         </BottomTab.Navigator>
