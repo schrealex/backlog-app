@@ -1,8 +1,7 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Pressable, StyleSheet, Text, View as ReactNativeView } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
-import ListItem from '../components/ListItem';
 import { View } from '../components/Themed';
 import { RootTabScreenProps } from '../types';
 import { Game } from '../types/Game';
@@ -11,6 +10,8 @@ import { completion, FULL_GAMES_LIST, gameCopy } from '../constants/FULL_GAMES_L
 import { addDoc, collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { Firestore } from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
+import ListItem from '../components/ListItem';
+import { RectButton, Swipeable } from 'react-native-gesture-handler';
 
 const sortProperty = {
     ALPHABETICAL: 'Alphabetical',
@@ -33,6 +34,68 @@ function ButtonContent({ sortBy, sortAscending }: any) {
         </View>
     );
 }
+
+const SwipeableRow = ({ item }: { item: any }) => {
+
+
+    const AnimatedView = Animated.createAnimatedComponent(ReactNativeView);
+
+    const renderLeftActions = (
+        _progress: Animated.AnimatedInterpolation<number>,
+        dragX: Animated.AnimatedInterpolation<number>
+    ) => {
+        const scale = dragX.interpolate({
+            inputRange: [0, 80],
+            outputRange: [0, 1],
+            extrapolate: 'clamp',
+        });
+        return (
+            <RectButton style={styles.leftAction} onPress={close}>
+                {/* Change it to some icons */}
+                <AnimatedView style={[styles.actionIcon, { transform: [{ scale }] }]} />
+            </RectButton>
+        );
+    };
+    const renderRightActions = (
+        _progress: Animated.AnimatedInterpolation<number>,
+        dragX: Animated.AnimatedInterpolation<number>
+    ) => {
+        const scale = dragX.interpolate({
+            inputRange: [-80, 0],
+            outputRange: [1, 0],
+            extrapolate: 'clamp',
+        });
+        return (
+            <RectButton style={styles.rightAction} onPress={close}>
+                {/* Change it to some icons */}
+                <AnimatedView style={[styles.actionIcon, { transform: [{ scale }] }]} />
+            </RectButton>
+        );
+    };
+
+    let swipeableRow: Swipeable;
+
+    const updateRef = (ref: Swipeable) => {
+        swipeableRow = ref;
+    };
+    const close = () => {
+        swipeableRow?.close();
+    };
+
+    return (
+        <Swipeable
+            ref={updateRef}
+            friction={2}
+            leftThreshold={80}
+            enableTrackpadTwoFingerGesture
+            rightThreshold={40}
+            renderLeftActions={renderLeftActions}
+            renderRightActions={renderRightActions}>
+            <ListItem item={item} type={'BACKLOG'} />
+        </Swipeable>
+    );
+
+};
 
 export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlog'>) {
     const [isLoading, setIsLoading] = useState(true);
@@ -213,7 +276,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
                     keyExtractor={(item => item.id.toString())}
                     style={styles.list}
                     renderItem={({ item }) => (
-                        <ListItem item={item} type={'BACKLOG'} />
+                        <SwipeableRow item={item} />
                     )}
                 />}
         </View>
@@ -221,6 +284,26 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
 }
 
 const styles = StyleSheet.create({
+    leftAction: {
+        flex: 1,
+        backgroundColor: '#388e3c',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        flexDirection: 'row-reverse',
+    },
+    actionIcon: {
+        width: 30,
+        marginHorizontal: 10,
+        backgroundColor: 'plum',
+        height: 20,
+    },
+    rightAction: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        backgroundColor: '#dd2c00',
+        flex: 1,
+        justifyContent: 'flex-end',
+    },
     container: {
         display: 'flex',
         alignItems: 'center',
