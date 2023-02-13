@@ -49,9 +49,23 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
             setIsLoading(false);
         }
 
+        async function loadMetacriticInformation() {
+            item.metacriticInfo = await getMetacriticInformation(item.title);
+            setIsLoading(false);
+        }
+
         if (mounted) {
             if (type === 'BACKLOG') {
                 loadHLTBInformation();
+                if (item.title !== 'DOOM II: Hell on Earth'
+                    && item.title !== 'Double Dragon 4'
+                    && item.title !== 'GRIS'
+                    && item.title !== 'NieR:Automata - The End of YoRHa Edition'
+                    && item.title !== 'NINJA GAIDEN: Master Collection'
+                    && item.title !== 'Mario + Rabbids Sparks of Hope'
+                ) {
+                    loadMetacriticInformation();
+                }
             } else {
                 setIsLoading(false);
             }
@@ -86,6 +100,28 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
         return foundGame;
     };
 
+    const getMetacriticInformation = async (title: string): Promise<any> => {
+        let filteredTitle = filterCharacters(title);
+
+        const metacriticInformationURL = `https://game-information.vercel.app/metacritic?title=${filteredTitle.replace('+', '%2B')}`;
+        const metacriticInformation = await fetch(metacriticInformationURL);
+
+        if (!metacriticInformation) {
+            console.log('Metacritic information fetch failed');
+        }
+        if (metacriticInformation.status === 403) {
+            console.log('Metacritic information rate limit');
+        }
+        if (!metacriticInformation.ok) {
+            console.log('Metacritic information request failed');
+        }
+        const response = await metacriticInformation.json();
+        if (response) {
+            return response.find((item: { title: string; }) => item.title.toLowerCase() === filteredTitle.toLowerCase());
+        }
+        return '';
+    };
+
     const findGameTitle = (item: HLTBInfo, filteredTitle: string) => {
         return item.game_name.toLowerCase() === filteredTitle.toLowerCase();
     };
@@ -118,20 +154,35 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
         return roundedToHalfOrWholeNumbers.toString();
     };
 
+    const getMetacriticScoreColor = (score: number) => {
+        if (score >= 75) {
+            return { backgroundColor: '#6c3' };
+        } else if (score >= 40) {
+            return { backgroundColor: '#fc3' };
+        } else if (score >= 75) {
+            return { backgroundColor: '#f00' };
+        }
+    };
+
     return (<View>
             {
                 isLoading ? <ActivityIndicator style={styles.loading} size="large" color="#fff" /> :
                     <View style={styles.item}>
-                        {item.image ?
-                            <Image source={{ uri: item.image, }} style={{ width: 272, height: 153, resizeMode: 'contain' }} /> :
-                            (item.hltbInfo ?
-                                <Image source={{ uri: 'https://howlongtobeat.com/games/' + item.hltbInfo.game_image, }}
-                                       style={{ width: 272, height: 153, resizeMode: 'contain' }} /> : null)
-                        }
+                        <View style={styles.imageContainer}>
+                            {item.image ?
+                                <Image source={{ uri: item.image, }} style={{ width: 272, height: 153, resizeMode: 'contain' }} /> :
+                                (item.hltbInfo ?
+                                    <Image source={{ uri: 'https://howlongtobeat.com/games/' + item.hltbInfo.game_image, }}
+                                           style={{ width: 272, height: 153, resizeMode: 'contain' }} /> : null)
+
+                            }
+                            {item.metacriticInfo ? <Text style={[styles.metacritic,
+                                getMetacriticScoreColor(Number(item.metacriticInfo.metacriticScore))]}>{item.metacriticInfo.metacriticScore}</Text> : null}
+                        </View>
                         <View style={styles.line}>
                             <View style={styles.inline}>
                                 <CompletionElement completionStatus={item.completion} />
-                                <Text>{item.title}</Text>
+                                <Text style={styles.title}>{item.title}</Text>
                                 <GameCopyElement gameCopyType={item.gameCopy} />
                             </View>
                             {type === 'BACKLOG' ? (<View>
@@ -185,6 +236,29 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    imageContainer: {
+        display: 'flex',
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        alignItems: 'flex-start',
+        paddingLeft: 39,
+        paddingRight: 39,
+    },
+    metacritic: {
+        display: 'flex',
+        justifyContent: 'center',
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        marginLeft: 5,
+        fontSize: 17,
+        fontWeight: 'bold',
+        backgroundColor: 'rgb(102, 163, 41)',
+        height: '2em',
+        width: '2em',
+        lineHeight: 34,
+        borderRadius: 6,
+    },
     line: {
         flexDirection: 'column',
         flexWrap: 'nowrap',
@@ -200,8 +274,9 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     title: {
-        fontSize: 20,
+        fontSize: 16,
         fontWeight: 'bold',
+
     },
     completion: {
         marginRight: 5,

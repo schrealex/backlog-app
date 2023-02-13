@@ -1,4 +1,5 @@
 import { HLTBInfo } from './HLTBInfo';
+import { MetacriticInfo } from './MetacriticInfo';
 
 export type Game = {
     completion: string,
@@ -9,4 +10,5 @@ export type Game = {
     year?: number;
     playState?: string;
     hltbInfo?: HLTBInfo;
+    metacriticInfo?: MetacriticInfo;
 }
