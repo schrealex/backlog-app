@@ -57,7 +57,8 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
         if (mounted) {
             if (type === 'BACKLOG') {
                 loadHLTBInformation();
-                if (item.title !== 'DOOM II: Hell on Earth'
+                if (item.title !== 'DARK SOULS™ Remastered'
+                    && item.title !== 'DOOM II: Hell on Earth'
                     && item.title !== 'Double Dragon 4'
                     && item.title !== 'GRIS'
                     && item.title !== 'NieR:Automata - The End of YoRHa Edition'

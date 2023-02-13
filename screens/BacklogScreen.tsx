@@ -14,7 +14,8 @@ import { firestore } from '../firebaseConfig';
 
 const sortProperty = {
     ALPHABETICAL: 'Alphabetical',
-    HLTB: 'Hltb'
+    HLTB: 'Hltb',
+    METACRITIC: 'Metacritic'
 };
 
 function ButtonContent({ sortBy, sortAscending }: any) {
@@ -28,8 +29,12 @@ function ButtonContent({ sortBy, sortAscending }: any) {
                 <FontAwesome5 name="sort-amount-down" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
             {sortBy === sortProperty.HLTB && sortAscending ?
                 <FontAwesome5 name="sort-amount-down-alt" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
+            {sortBy === sortProperty.METACRITIC && !sortAscending ?
+                <FontAwesome5 name="sort-numeric-down-alt" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
+            {sortBy === sortProperty.METACRITIC && sortAscending ?
+                <FontAwesome5 name="sort-numeric-down" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
             <Text
-                style={styles.buttonText}>{sortBy === sortProperty.ALPHABETICAL ? 'Sort Alphabetical' : sortBy === sortProperty.HLTB ? 'Sort by HLTB' : ''}</Text>
+                style={styles.buttonText}>{sortBy === sortProperty.ALPHABETICAL ? 'Sort Alphabetical' : sortBy === sortProperty.HLTB ? 'Sort by HLTB' : sortBy === sortProperty.METACRITIC ? 'Sort by Metacritic' : ''}</Text>
         </View>
     );
 }
@@ -97,6 +102,8 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
             sortAlphabetical();
         } else if (sortBy === sortProperty.HLTB) {
             sortByHLTB();
+        } else if (sortBy === sortProperty.METACRITIC) {
+            sortByMetacritic();
         }
     }, [sortBy, sortAscending]);
 
@@ -151,6 +158,12 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
             setSortBy(sortProperty.HLTB);
             setSortAscending(false);
         } else if (sortBy === sortProperty.HLTB && !sortAscending) {
+            setSortBy(sortProperty.METACRITIC);
+            setSortAscending(true);
+        } else if (sortBy === sortProperty.METACRITIC && sortAscending) {
+            setSortBy(sortProperty.METACRITIC);
+            setSortAscending(false);
+        } else if (sortBy === sortProperty.METACRITIC && !sortAscending) {
             setSortBy(sortProperty.ALPHABETICAL);
             setSortAscending(true);
         }
@@ -174,6 +187,22 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
                 return (a.hltbInfo.comp_main && !b.hltbInfo.comp_main) ? -1 : (!a.hltbInfo.comp_main && b.hltbInfo.comp_main) ? 1 : 0;
             }
             return (a.hltbInfo && !b.hltbInfo) ? -1 : (!a.hltbInfo && b.hltbInfo) ? 1 : 0;
+        });
+        setBacklogData(sortedList);
+    };
+
+    const sortByMetacritic = () => {
+        console.log('sortByMetacritic');
+        const sortedList = [...backlogData].sort((a: any, b: any) => {
+            if (a.metacriticInfo && b.metacriticInfo) {
+                if (a.metacriticInfo.metacriticScore && b.metacriticInfo.metacriticScore) {
+                    console.log({ a: a.metacriticInfo.metacriticScore, b: b.metacriticInfo.metacriticScore });
+                    return sortAscending ? a.metacriticInfo.metacriticScore - b.metacriticInfo.metacriticScore :
+                        b.metacriticInfo.metacriticScore - a.metacriticInfo.metacriticScore;
+                }
+                return (a.metacriticInfo.metacriticScore && !b.metacriticInfo.metacriticScore) ? -1 : (!a.metacriticInfo.metacriticScore && b.metacritic.metacriticScore) ? 1 : 0;
+            }
+            return (a.metacriticInfo && !b.metacriticInfo) ? -1 : (!a.metacriticInfo && b.metacriticInfo) ? 1 : 0;
         });
         setBacklogData(sortedList);
     };
