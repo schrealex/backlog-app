@@ -61,7 +61,8 @@ function BottomTabNavigator() {
         <BottomTab.Navigator
             initialRouteName="Backlog"
             screenOptions={{
-                tabBarActiveTintColor: Colors[colorScheme].tint,
+                tabBarActiveTintColor: Colors['dark'].tint,
+                tabBarStyle: [{ height: 66, paddingTop: 4, paddingBottom: 10 }]
             }}>
             <BottomTab.Screen
                 name="Backlog"

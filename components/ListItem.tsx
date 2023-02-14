@@ -46,27 +46,30 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
 
         async function loadHLTBInformation() {
             item.hltbInfo = await getHLTBInformation(item.title, item.year);
-            setIsLoading(false);
         }
 
         async function loadMetacriticInformation() {
             item.metacriticInfo = await getMetacriticInformation(item.title);
+        }
+
+        async function loadInformation() {
+            await loadHLTBInformation();
+            if (item.title !== 'DARK SOULS™ Remastered'
+                && item.title !== 'DOOM II: Hell on Earth'
+                && item.title !== 'Double Dragon 4'
+                && item.title !== 'GRIS'
+                && item.title !== 'NieR:Automata - The End of YoRHa Edition'
+                && item.title !== 'NINJA GAIDEN: Master Collection'
+                && item.title !== 'Mario + Rabbids Sparks of Hope'
+            ) {
+                await loadMetacriticInformation();
+            }
             setIsLoading(false);
         }
 
         if (mounted) {
             if (type === 'BACKLOG') {
-                loadHLTBInformation();
-                if (item.title !== 'DARK SOULS™ Remastered'
-                    && item.title !== 'DOOM II: Hell on Earth'
-                    && item.title !== 'Double Dragon 4'
-                    && item.title !== 'GRIS'
-                    && item.title !== 'NieR:Automata - The End of YoRHa Edition'
-                    && item.title !== 'NINJA GAIDEN: Master Collection'
-                    && item.title !== 'Mario + Rabbids Sparks of Hope'
-                ) {
-                    loadMetacriticInformation();
-                }
+                loadInformation();
             } else {
                 setIsLoading(false);
             }
@@ -230,8 +233,10 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
 const styles = StyleSheet.create({
     loading: {
         height: 233,
+        width: 350,
     },
     item: {
+        width: 350,
         padding: 10,
         fontSize: 16,
         alignItems: 'center',
@@ -265,14 +270,16 @@ const styles = StyleSheet.create({
         flexWrap: 'nowrap',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 8,
+        marginTop: 4,
+        marginBottom: 4,
     },
     inline: {
         flexDirection: 'row',
         flexWrap: 'nowrap',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 8,
+        marginTop: 4,
+        marginBottom: 4,
     },
     title: {
         fontSize: 16,
@@ -280,7 +287,7 @@ const styles = StyleSheet.create({
 
     },
     completion: {
-        marginRight: 5,
+        marginRight: 14,
     },
     timeToBeatContainer: {
         flexDirection: 'row',
@@ -303,7 +310,7 @@ const styles = StyleSheet.create({
         marginLeft: 4,
     },
     gameCopy: {
-        marginLeft: 5,
+        marginLeft: 14,
     },
     gameCopyBoth: {
         flexDirection: 'row',

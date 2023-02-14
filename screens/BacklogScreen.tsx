@@ -109,22 +109,27 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
 
     const isAll = () => {
         setBacklogData(getAll());
+        resetSort();
     };
 
     const isPhysical = () => {
         setBacklogData(getOnlyPhysical());
+        resetSort();
     };
 
     const isDigital = () => {
         setBacklogData(getOnlyDigital());
+        resetSort();
     };
 
     const isPlaying = () => {
         setBacklogData(getPlaying());
+        resetSort();
     };
 
     const isPaused = () => {
         setBacklogData(getPaused());
+        resetSort();
     };
 
     const getAll = () => {
@@ -192,11 +197,9 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
     };
 
     const sortByMetacritic = () => {
-        console.log('sortByMetacritic');
         const sortedList = [...backlogData].sort((a: any, b: any) => {
             if (a.metacriticInfo && b.metacriticInfo) {
                 if (a.metacriticInfo.metacriticScore && b.metacriticInfo.metacriticScore) {
-                    console.log({ a: a.metacriticInfo.metacriticScore, b: b.metacriticInfo.metacriticScore });
                     return sortAscending ? a.metacriticInfo.metacriticScore - b.metacriticInfo.metacriticScore :
                         b.metacriticInfo.metacriticScore - a.metacriticInfo.metacriticScore;
                 }
@@ -205,6 +208,11 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
             return (a.metacriticInfo && !b.metacriticInfo) ? -1 : (!a.metacriticInfo && b.metacriticInfo) ? 1 : 0;
         });
         setBacklogData(sortedList);
+    };
+
+    const resetSort = () => {
+        setSortAscending(true);
+        setSortBy(sortProperty.ALPHABETICAL);
     };
 
     return (
@@ -241,6 +249,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
                     data={backlogData}
                     keyExtractor={(item => item.id.toString())}
                     style={styles.list}
+                    contentContainerStyle={styles.listScrollContent}
                     renderItem={({ item }) => (
                         <ListItem item={item} type={'BACKLOG'} />
                     )}
@@ -257,7 +266,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     list: {
+        width: '100%',
         paddingBottom: 100,
+    },
+    listScrollContent: {
+        display: 'flex',
+        alignItems: 'center',
     },
     buttonGroup: {
         display: 'flex',
