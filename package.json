@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "entry.js",
   "scripts": {
-    "start": "expo start",
+    "start": "NODE_OPTIONS=--openssl-legacy-provider npx expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "NODE_OPTIONS=--openssl-legacy-provider npx expo start --web",

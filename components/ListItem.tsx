@@ -189,10 +189,10 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
                                 <Text style={styles.title}>{item.title}</Text>
                                 <GameCopyElement gameCopyType={item.gameCopy} />
                             </View>
-                            {type === 'BACKLOG' ? (<View>
+                            {type === 'BACKLOG' ? (<View style={styles.timeToBeatContainer}>
                                 {
                                     item.hltbInfo && (item.hltbInfo.comp_main > 0 || item.hltbInfo.comp_plus > 0) ? (
-                                        <View style={styles.timeToBeatContainer}>
+                                        <View style={styles.timeToBeatElement}>
                                             <FontAwesome5 name="clock" size={20} color="gold"
                                                           style={{ backgroundColor: 'rgba(243,197,0,0.34)', borderRadius: 50, padding: 8 }} />
                                             <View style={styles.timeToBeatWrapper}>
@@ -253,19 +253,22 @@ const styles = StyleSheet.create({
     metacritic: {
         display: 'flex',
         justifyContent: 'center',
+        alignItems: 'center',
         position: 'absolute',
         top: 0,
         right: 0,
         marginLeft: 5,
         fontSize: 17,
         fontWeight: 'bold',
+        textAlign: 'center',
         backgroundColor: 'rgb(102, 163, 41)',
-        height: '2em',
-        width: '2em',
+        height: 34,
+        width: 34,
         lineHeight: 34,
         borderRadius: 6,
     },
     line: {
+        display: 'flex',
         flexDirection: 'column',
         flexWrap: 'nowrap',
         alignItems: 'center',
@@ -284,17 +287,24 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 16,
         fontWeight: 'bold',
+        maxWidth: 272,
 
     },
     completion: {
         marginRight: 14,
     },
     timeToBeatContainer: {
+        display: 'flex',
         flexDirection: 'row',
         alignItems: 'center',
         fontSize: 12,
         paddingTop: 4,
         marginLeft: 4,
+    },
+    timeToBeatElement: {
+        display: 'flex',
+        flexDirection: 'row',
+        marginLeft: -20,
     },
     timeToBeatWrapper: {
         flexDirection: 'row',
