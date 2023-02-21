@@ -47,7 +47,11 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
         async function getGames(fs: Firestore) {
             const fullGamesList = collection(fs, 'retro-backlog');
             const fullGamesListSnapshot = await getDocs(fullGamesList);
-            return fullGamesListSnapshot.docs.map(doc => doc.data());
+            return fullGamesListSnapshot.docs.map(doc => {
+                const documentId = doc.id;
+                const data = doc.data();
+                return { ...data, documentId };
+            });
         }
 
         async function getFullList() {
@@ -193,7 +197,7 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
                     keyExtractor={(item => item.id.toString())}
                     style={styles.list}
                     renderItem={({ item }) => (
-                        <ListItem item={item} type={'BACKLOG'} />
+                        <ListItem item={item} type={'RETRO_BACKLOG'} />
                     )}
                 />}
         </View>

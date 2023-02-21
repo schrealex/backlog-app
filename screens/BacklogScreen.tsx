@@ -53,7 +53,11 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
             const fullGamesList = collection(fs, 'full-games-list');
             const whereQuery = query(fullGamesList, where('completion', 'not-in', ['Beaten', 'Completed', 'Continuous', 'Dropped']));
             const fullGamesListSnapshot = await getDocs(whereQuery);
-            return fullGamesListSnapshot.docs.map(doc => doc.data());
+            return fullGamesListSnapshot.docs.map(doc => {
+                const documentId = doc.id;
+                const data = doc.data();
+                return { ...data, documentId };
+            });
         }
 
 
@@ -246,7 +250,9 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
             {isLoading ?
                 <ActivityIndicator size="large" color="#fff" /> :
                 <FlatList
+                    removeClippedSubviews
                     data={backlogData}
+                    initialNumToRender={8}
                     keyExtractor={(item => item.id.toString())}
                     style={styles.list}
                     contentContainerStyle={styles.listScrollContent}

@@ -157,7 +157,7 @@ export default function FullListScreen() {
                     data={fullListData}
                     keyExtractor={(item => item.id.toString())}
                     renderItem={({ item }) => (
-                        <ListItem item={item} type={'FULL-LIST'} />
+                        <ListItem item={item} type={'FULL_LIST'} />
                     )}
                 />}
         </View>

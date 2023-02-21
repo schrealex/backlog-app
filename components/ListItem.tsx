@@ -1,11 +1,16 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet } from 'react-native';
+import { memo, useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Text, View } from './Themed';
 import { Game } from '../types/Game';
 import { HLTBInfo } from '../types/HLTBInfo';
 import { completion, gameCopy } from '../constants/FULL_GAMES_LIST';
+
+import { doc, updateDoc } from 'firebase/firestore/lite';
+import { firestore } from '../firebaseConfig';
+
+;
 
 function CompletionElement({ completionStatus }: { completionStatus: string }) {
     return (
@@ -20,6 +25,60 @@ function CompletionElement({ completionStatus }: { completionStatus: string }) {
         </View>
     );
 }
+
+function CompletionStatusesMenu({ type, item, toggleMenu }: { type: string, item: Game, toggleMenu: any }) {
+    return (
+        <View style={styles.completionStatusesMenu}>
+            <Text style={styles.completionStatusesMenuTitle}>Change completion status</Text>
+            {item.completion !== completion.NOT_STARTED ?
+                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.NOT_STARTED} /> : null}
+            {item.completion !== completion.UNFINISHED ?
+                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.UNFINISHED} /> : null}
+            {item.completion !== completion.PAUSED ?
+                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.PAUSED} /> : null}
+            {item.completion !== completion.DROPPED ?
+                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.DROPPED} /> : null}
+            {item.completion !== completion.BEATEN ?
+                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.BEATEN} /> : null}
+            {item.completion !== completion.COMPLETED ?
+                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.COMPLETED} /> : null}
+        </View>
+    );
+}
+
+function CompletionStatusesMenuItem({
+                                        type,
+                                        item,
+                                        completionStatus,
+                                        toggleMenu
+                                    }: { type: string, item: any, completionStatus: string, toggleMenu: any }) {
+
+    const changeStatus = (status: string): void => {
+        item.completion = status;
+
+        updateFirebaseDocumentWithStatus(status);
+        toggleMenu();
+    };
+
+    const updateFirebaseDocumentWithStatus = async (status: string) => {
+        const path = type === 'BACKLOG' ? 'full-games-list' : type === 'RETRO_BACKLOG' ? 'retro-backlog' : '';
+        const documentReference = doc(firestore, path, item.documentId);
+        updateDoc(documentReference, {
+            completion: status
+        })
+            .then()
+            .catch(error => {
+                console.log(error);
+            });
+    };
+
+    return (
+        <Pressable style={styles.completionStatusesMenuItem} onPress={() => changeStatus(completionStatus)}>
+            <Text style={styles.completionStatusesMenuItemText}>{completionStatus}</Text>
+        </Pressable>
+    );
+}
+
 
 function GameCopyElement({ gameCopyType }: { gameCopyType: Array<string> }) {
     return (
@@ -37,9 +96,10 @@ function GameCopyElement({ gameCopyType }: { gameCopyType: Array<string> }) {
     );
 }
 
-export default function ListItem({ item, type }: { item: Game, type: string }) {
+const ListItem = ({ item, type }: { item: Game, type: string }) => {
 
     const [isLoading, setIsLoading] = useState(true);
+    const [isMenuVisible, setIsMenuVisible] = useState(false);
 
     useEffect(() => {
         let mounted = true;
@@ -54,21 +114,12 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
 
         async function loadInformation() {
             await loadHLTBInformation();
-            if (item.title !== 'DARK SOULS™ Remastered'
-                && item.title !== 'DOOM II: Hell on Earth'
-                && item.title !== 'Double Dragon 4'
-                && item.title !== 'GRIS'
-                && item.title !== 'NieR:Automata - The End of YoRHa Edition'
-                && item.title !== 'NINJA GAIDEN: Master Collection'
-                && item.title !== 'Mario + Rabbids Sparks of Hope'
-            ) {
-                await loadMetacriticInformation();
-            }
+            await loadMetacriticInformation();
             setIsLoading(false);
         }
 
         if (mounted) {
-            if (type === 'BACKLOG') {
+            if (type === 'BACKLOG' || type === 'RETRO_BACKLOG') {
                 loadInformation();
             } else {
                 setIsLoading(false);
@@ -107,7 +158,7 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
     const getMetacriticInformation = async (title: string): Promise<any> => {
         let filteredTitle = filterCharacters(title);
 
-        const metacriticInformationURL = `https://game-information.vercel.app/metacritic?title=${filteredTitle.replace('+', '%2B')}`;
+        const metacriticInformationURL = `https://game-information.vercel.app/metacritic?title=${filteredTitle.replace('+', '%2B')}&type=${type}`;
         const metacriticInformation = await fetch(metacriticInformationURL);
 
         if (!metacriticInformation) {
@@ -120,7 +171,7 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
             console.log('Metacritic information request failed');
         }
         const response = await metacriticInformation.json();
-        if (response) {
+        if (response && response.name !== 'TimeoutError') {
             return response.find((item: { title: string; }) => item.title.toLowerCase() === filteredTitle.toLowerCase());
         }
         return '';
@@ -165,70 +216,85 @@ export default function ListItem({ item, type }: { item: Game, type: string }) {
             return { backgroundColor: '#fc3' };
         } else if (score >= 75) {
             return { backgroundColor: '#f00' };
+        } else {
+            return { backgroundColor: '#cccccc' };
         }
+    };
+
+    const toggleMenu = () => {
+        setIsMenuVisible(!isMenuVisible);
     };
 
     return (<View>
             {
                 isLoading ? <ActivityIndicator style={styles.loading} size="large" color="#fff" /> :
-                    <View style={styles.item}>
-                        <View style={styles.imageContainer}>
-                            {item.image ?
-                                <Image source={{ uri: item.image, }} style={{ width: 272, height: 153, resizeMode: 'contain' }} /> :
-                                (item.hltbInfo ?
-                                    <Image source={{ uri: 'https://howlongtobeat.com/games/' + item.hltbInfo.game_image, }}
-                                           style={{ width: 272, height: 153, resizeMode: 'contain' }} /> : null)
+                    <Pressable onPress={toggleMenu}>
+                        <View style={styles.item}>
+                            {isMenuVisible ?
+                                <View style={styles.menu}><CompletionStatusesMenu type={type} item={item} toggleMenu={toggleMenu} /></View> : null}
+                            <View style={styles.imageContainer}>
+                                {item.image ?
+                                    <Image source={{ uri: item.image, }} style={{ width: 272, height: 153, resizeMode: 'contain' }} /> :
+                                    (item.hltbInfo ?
+                                        <Image source={{ uri: 'https://howlongtobeat.com/games/' + item.hltbInfo.game_image, }}
+                                               style={{ width: 272, height: 153, resizeMode: 'contain' }} /> : null)
 
-                            }
-                            {item.metacriticInfo ? <Text style={[styles.metacritic,
-                                getMetacriticScoreColor(Number(item.metacriticInfo.metacriticScore))]}>{item.metacriticInfo.metacriticScore}</Text> : null}
-                        </View>
-                        <View style={styles.line}>
-                            <View style={styles.inline}>
-                                <CompletionElement completionStatus={item.completion} />
-                                <Text style={styles.title}>{item.title}</Text>
-                                <GameCopyElement gameCopyType={item.gameCopy} />
+                                }
+                                {item.metacriticInfo ? <Text style={[styles.metacritic,
+                                    getMetacriticScoreColor(Number(item.metacriticInfo.metacriticScore))]}>{item.metacriticInfo.metacriticScore}</Text> : null}
                             </View>
-                            {type === 'BACKLOG' ? (<View style={styles.timeToBeatContainer}>
-                                {
-                                    item.hltbInfo && (item.hltbInfo.comp_main > 0 || item.hltbInfo.comp_plus > 0) ? (
-                                        <View style={styles.timeToBeatElement}>
-                                            <FontAwesome5 name="clock" size={20} color="gold"
-                                                          style={{ backgroundColor: 'rgba(243,197,0,0.34)', borderRadius: 50, padding: 8 }} />
-                                            <View style={styles.timeToBeatWrapper}>
-                                                <View style={styles.timeToBeat}>
-                                                    <FontAwesome5 name="flag-checkered" size={14} color="gold"
-                                                                  style={{ backgroundColor: 'rgba(243,197,0,0.34)', borderRadius: 50, padding: 5 }} />
-                                                    <Text style={styles.timeToBeatText}>
-                                                        {
-                                                            getPlayTimeInHoursAndMinutes(item.hltbInfo.comp_main > 0 ? item.hltbInfo.comp_main : item.hltbInfo.comp_plus)
-                                                        } hours
-                                                    </Text>
-                                                </View>
-                                                {item.hltbInfo.comp_100 > 0 ?
+                            <View style={styles.line}>
+                                <View style={styles.inline}>
+                                    <CompletionElement completionStatus={item.completion} />
+                                    <Text style={styles.title}>{item.title}</Text>
+                                    <GameCopyElement gameCopyType={item.gameCopy} />
+                                </View>
+                                {type === 'BACKLOG' || type === 'RETRO_BACKLOG' ? (<View style={styles.timeToBeatContainer}>
+                                    {
+                                        item.hltbInfo && (item.hltbInfo.comp_main > 0 || item.hltbInfo.comp_plus > 0) ? (
+                                            <View style={styles.timeToBeatElement}>
+                                                <FontAwesome5 name="clock" size={20} color="gold"
+                                                              style={{ backgroundColor: 'rgba(243,197,0,0.34)', borderRadius: 50, padding: 8 }} />
+                                                <View style={styles.timeToBeatWrapper}>
                                                     <View style={styles.timeToBeat}>
-                                                        <FontAwesome5 name="trophy" size={14} color="gold"
+                                                        <FontAwesome5 name="flag-checkered" size={14} color="gold"
                                                                       style={{
                                                                           backgroundColor: 'rgba(243,197,0,0.34)',
                                                                           borderRadius: 50,
                                                                           padding: 5
                                                                       }} />
                                                         <Text style={styles.timeToBeatText}>
-                                                            {getPlayTimeInHoursAndMinutes(item.hltbInfo.comp_100)} hours
+                                                            {
+                                                                getPlayTimeInHoursAndMinutes(item.hltbInfo.comp_main > 0 ? item.hltbInfo.comp_main : item.hltbInfo.comp_plus)
+                                                            } hours
                                                         </Text>
                                                     </View>
-                                                    : null}
+                                                    {item.hltbInfo.comp_100 > 0 ?
+                                                        <View style={styles.timeToBeat}>
+                                                            <FontAwesome5 name="trophy" size={14} color="gold"
+                                                                          style={{
+                                                                              backgroundColor: 'rgba(243,197,0,0.34)',
+                                                                              borderRadius: 50,
+                                                                              padding: 5
+                                                                          }} />
+                                                            <Text style={styles.timeToBeatText}>
+                                                                {getPlayTimeInHoursAndMinutes(item.hltbInfo.comp_100)} hours
+                                                            </Text>
+                                                        </View>
+                                                        : null}
+                                                </View>
                                             </View>
-                                        </View>
-                                    ) : null
-                                }</View>) : null
-                            }
+                                        ) : null
+                                    }</View>) : null
+                                }
+                            </View>
                         </View>
-                    </View>
+                    </Pressable>
             }
         </View>
     );
-}
+};
+export default memo(ListItem);
 
 const styles = StyleSheet.create({
     loading: {
@@ -241,6 +307,40 @@ const styles = StyleSheet.create({
         fontSize: 16,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    menu: {
+        display: 'flex',
+        justifyContent: 'space-around',
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        width: '70%',
+        height: '100%',
+        zIndex: 1000,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    },
+    completionStatusesMenu: {
+        display: 'flex',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0)',
+    },
+    completionStatusesMenuTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        padding: 6,
+        borderBottomWidth: 2,
+        borderStyle: 'solid',
+        borderColor: '#ffffff',
+    },
+    completionStatusesMenuItem: {
+        margin: 8,
+        fontSize: 15,
+        fontWeight: 'bold',
+        backgroundColor: 'rgba(0, 0, 0, 0)',
+    },
+    completionStatusesMenuItemText: {
+        fontSize: 17,
+        fontWeight: 'bold',
     },
     imageContainer: {
         display: 'flex',
