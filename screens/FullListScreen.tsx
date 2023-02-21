@@ -2,9 +2,12 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text } from 'react-
 import { View } from '../components/Themed';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { completion, FULL_GAMES_LIST, gameCopy } from '../constants/FULL_GAMES_LIST';
+import { completion, gameCopy } from '../constants/FULL_GAMES_LIST';
 import ListItem from '../components/ListItem';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { Firestore } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore/lite';
+import { firestore } from '../firebaseConfig';
 
 const sortProperty = {
     ALPHABETICAL: 'Alphabetical'
@@ -33,10 +36,27 @@ export default function FullListScreen() {
     useEffect(() => {
         let mounted = true;
 
+        async function getGames(fs: Firestore) {
+            const fullGamesList = collection(fs, 'full-games-list');
+            const fullGamesListSnapshot = await getDocs(fullGamesList);
+            return fullGamesListSnapshot.docs.map(doc => {
+                const documentId = doc.id;
+                const data = doc.data();
+                return { ...data, documentId };
+            });
+        }
+
         async function getFullList() {
-            setFullList(FULL_GAMES_LIST);
-            setFullListData(FULL_GAMES_LIST);
-            setIsLoading(false);
+
+            getGames(firestore).then(result => {
+                const fullList: Array<any> = result.sort((a: any, b: any) => {
+                    return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
+                        b.title.toLowerCase().localeCompare(a.title.toLowerCase());
+                });
+                setFullList(fullList);
+                setFullListData(fullList);
+                setIsLoading(false);
+            });
         }
 
         if (mounted) {
