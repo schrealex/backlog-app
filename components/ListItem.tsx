@@ -1,189 +1,23 @@
 import * as React from 'react';
-import { memo, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Text, View } from './Themed';
 import { Game } from '../types/Game';
 import { HLTBInfo } from '../types/HLTBInfo';
-import { completion, gameCopy } from '../constants/FULL_GAMES_LIST';
+import { GameCopyElement } from './GameCopyElement';
+import { CompletionElement } from './CompletionElement';
+import { CompletionStatusesMenu } from './CompletionStatusesMenu';
+import { MetacriticInfo } from '../types/MetacriticInfo';
 
-import { doc, updateDoc } from 'firebase/firestore/lite';
-import { firestore } from '../firebaseConfig';
-
-;
-
-function CompletionElement({ completionStatus }: { completionStatus: string }) {
-    return (
-        <View style={styles.completion}>
-            {completionStatus === completion.COMPLETED ? <FontAwesome5 name="trophy" size={20} color="red" /> : null}
-            {completionStatus === completion.BEATEN ? <FontAwesome5 name="fist-raised" size={20} color="red" /> : null}
-            {completionStatus == completion.UNFINISHED ? <FontAwesome5 name="gamepad" size={20} color="red" /> : null}
-            {completionStatus === completion.PAUSED ? <FontAwesome5 name="pause" size={20} color="red" /> : null}
-            {completionStatus === completion.NOT_STARTED ? <FontAwesome5 name="stop" size={20} color="red" /> : null}
-            {completionStatus === completion.DROPPED ? <FontAwesome5 name="times" size={20} color="red" /> : null}
-            {completionStatus === completion.CONTINUOUS ? <FontAwesome5 name="recycle" size={20} color="red" /> : null}
-        </View>
-    );
+interface Cache {
+    [key: string]: any;
 }
 
-function CompletionStatusesMenu({ type, item, toggleMenu }: { type: string, item: Game, toggleMenu: any }) {
-    return (
-        <View style={styles.completionStatusesMenu}>
-            <Text style={styles.completionStatusesMenuTitle}>Change completion status</Text>
-            {item.completion !== completion.NOT_STARTED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.NOT_STARTED} /> : null}
-            {item.completion !== completion.UNFINISHED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.UNFINISHED} /> : null}
-            {item.completion !== completion.PAUSED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.PAUSED} /> : null}
-            {item.completion !== completion.DROPPED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.DROPPED} /> : null}
-            {item.completion !== completion.BEATEN ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.BEATEN} /> : null}
-            {item.completion !== completion.COMPLETED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={completion.COMPLETED} /> : null}
-        </View>
-    );
-}
-
-function CompletionStatusesMenuItem({
-                                        type,
-                                        item,
-                                        completionStatus,
-                                        toggleMenu
-                                    }: { type: string, item: any, completionStatus: string, toggleMenu: any }) {
-
-    const changeStatus = (status: string): void => {
-        item.completion = status;
-
-        updateFirebaseDocumentWithStatus(status);
-        toggleMenu();
-    };
-
-    const updateFirebaseDocumentWithStatus = async (status: string) => {
-        const path = type === 'BACKLOG' ? 'full-games-list' : type === 'RETRO_BACKLOG' ? 'retro-backlog' : '';
-        const documentReference = doc(firestore, path, item.documentId);
-        updateDoc(documentReference, {
-            completion: status
-        })
-            .then()
-            .catch(error => {
-                console.log(error);
-            });
-    };
-
-    return (
-        <Pressable style={styles.completionStatusesMenuItem} onPress={() => changeStatus(completionStatus)}>
-            <Text style={styles.completionStatusesMenuItemText}>{completionStatus}</Text>
-        </Pressable>
-    );
-}
-
-
-function GameCopyElement({ gameCopyType }: { gameCopyType: Array<string> }) {
-    return (
-        <View style={styles.gameCopy}>
-            {gameCopyType.includes(gameCopy.PHYSICAL) && gameCopyType.includes(gameCopy.DIGITAL) ?
-                <View style={styles.gameCopyBoth}>
-                    <FontAwesome5 name="compact-disc" size={20} color="red" />
-                    <FontAwesome5 name="hdd" size={20} color="red" />
-                </View>
-                : gameCopyType.includes(gameCopy.PHYSICAL) ?
-                    <FontAwesome5 name="compact-disc" size={20} color="red" /> :
-                    <FontAwesome5 name="hdd" size={20} color="red" />
-            }
-        </View>
-    );
-}
-
-const ListItem = ({ item, type }: { item: Game, type: string }) => {
+const ListItem = React.memo(({ item, type }: { item: Game, type: string }) => {
 
     const [isLoading, setIsLoading] = useState(true);
     const [isMenuVisible, setIsMenuVisible] = useState(false);
-
-    useEffect(() => {
-        let mounted = true;
-
-        async function loadHLTBInformation() {
-            item.hltbInfo = await getHLTBInformation(item.title, item.year);
-        }
-
-        async function loadMetacriticInformation() {
-            item.metacriticInfo = await getMetacriticInformation(item.title);
-        }
-
-        async function loadInformation() {
-            await loadHLTBInformation();
-            await loadMetacriticInformation();
-            setIsLoading(false);
-        }
-
-        if (mounted) {
-            if (type === 'BACKLOG' || type === 'RETRO_BACKLOG') {
-                loadInformation();
-            } else {
-                setIsLoading(false);
-            }
-        }
-
-        return function cleanUp() {
-            mounted = false;
-        };
-    }, []);
-
-    const getHLTBInformation = async (title: string, year?: number): Promise<HLTBInfo> => {
-        let filteredTitle = filterCharacters(title);
-
-        const gameInformationURL = `https://game-information.vercel.app/how-long-to-beat?title=${filteredTitle.replace('+', '%2B')}${year ? `&year=${year}` : ''}`;
-        const gameInformation = await fetch(gameInformationURL);
-
-        if (!gameInformation) {
-            console.log('HLTB information fetch failed');
-        }
-        if (gameInformation.status === 403) {
-            console.log('HLTB information rate limit');
-        }
-        if (!gameInformation.ok) {
-            console.log('HLTB information request failed');
-        }
-        const response = await gameInformation.json();
-        let foundGame;
-        foundGame = response.data.find((item: HLTBInfo) => findGameInAliases(item, filteredTitle));
-        if (!foundGame) {
-            foundGame = response.data.find((item: HLTBInfo) => findGameTitle(item, filteredTitle));
-        }
-        return foundGame;
-    };
-
-    const getMetacriticInformation = async (title: string): Promise<any> => {
-        let filteredTitle = filterCharacters(title);
-
-        const metacriticInformationURL = `https://game-information.vercel.app/metacritic?title=${filteredTitle.replace('+', '%2B')}&type=${type}`;
-        const metacriticInformation = await fetch(metacriticInformationURL);
-
-        if (!metacriticInformation) {
-            console.log('Metacritic information fetch failed');
-        }
-        if (metacriticInformation.status === 403) {
-            console.log('Metacritic information rate limit');
-        }
-        if (!metacriticInformation.ok) {
-            console.log('Metacritic information request failed');
-        }
-        const response = await metacriticInformation.json();
-        if (response && response.name !== 'TimeoutError') {
-            return response.find((item: { title: string; }) => item.title.toLowerCase() === filteredTitle.toLowerCase());
-        }
-        return '';
-    };
-
-    const findGameTitle = (item: HLTBInfo, filteredTitle: string) => {
-        return item.game_name.toLowerCase() === filteredTitle.toLowerCase();
-    };
-
-    const findGameInAliases = (item: HLTBInfo, filteredTitle: string) => {
-        return item.game_alias.split(', ').map(alias => alias.toLowerCase()).find(alias => alias === filteredTitle.toLowerCase());
-    };
 
     const filterCharacters = (title: string): string => {
         const copyrightSign = String.fromCharCode(169);
@@ -201,6 +35,97 @@ const ListItem = ({ item, type }: { item: Game, type: string }) => {
         return filteredTitle;
     };
 
+    const filteredTitle = useMemo(() => filterCharacters(item.title), [item.title]);
+
+    useEffect(() => {
+        let mounted = true;
+
+        async function loadInformation() {
+            const [retrievedHLTBInfo, retrievedMetacriticInfo] = await Promise.all([getHLTBInformation(), getMetacriticInformation()]);
+            if (mounted) {
+                item.hltbInfo = retrievedHLTBInfo;
+                item.metacriticInfo = retrievedMetacriticInfo;
+                setIsLoading(false);
+            }
+        }
+
+        if (mounted) {
+            if (type === 'BACKLOG' || type === 'RETRO_BACKLOG') {
+                loadInformation();
+            } else {
+                setIsLoading(false);
+            }
+        }
+
+        return function cleanUp() {
+            mounted = false;
+        };
+    }, []);
+
+    const getHLTBInformation = async (): Promise<HLTBInfo> => {
+        if (getHLTBInformation.cache[filteredTitle]) {
+            return getHLTBInformation.cache[filteredTitle];
+        }
+
+        const gameInformationURL = `https://game-information.vercel.app/how-long-to-beat?title=${filteredTitle.replace('+', '%2B')}${item.year ? `&year=${item.year}` : ''}`;
+        const gameInformation = await fetch(gameInformationURL);
+
+        if (!gameInformation) {
+            console.log('HLTB information fetch failed');
+        }
+        if (gameInformation.status === 403) {
+            console.log('HLTB information rate limit');
+        }
+        if (!gameInformation.ok) {
+            console.log('HLTB information request failed');
+        }
+        const response = await gameInformation.json();
+        let foundGame;
+        foundGame = response.data.find((item: HLTBInfo) => findGameInAliases(item, filteredTitle));
+        if (!foundGame) {
+            foundGame = response.data.find((item: HLTBInfo) => findGameTitle(item, filteredTitle));
+        }
+        getHLTBInformation.cache[filteredTitle] = foundGame;
+        return foundGame;
+    };
+
+    getHLTBInformation.cache = {} as Cache;
+
+    const getMetacriticInformation = async (): Promise<MetacriticInfo> => {
+        if (getMetacriticInformation.cache[filteredTitle]) {
+            return getMetacriticInformation.cache[filteredTitle];
+        }
+
+        const metacriticInformationURL = `https://game-information.vercel.app/metacritic?title=${filteredTitle.replace('+', '%2B')}&type=${type}`;
+        const metacriticInformation = await fetch(metacriticInformationURL);
+
+        if (!metacriticInformation) {
+            console.log('Metacritic information fetch failed');
+        }
+        if (metacriticInformation.status === 403) {
+            console.log('Metacritic information rate limit');
+        }
+        if (!metacriticInformation.ok) {
+            console.log('Metacritic information request failed');
+        }
+        const response = await metacriticInformation.json();
+        let result;
+        if (response && response.name !== 'TimeoutError') {
+            result = response.find((item: { title: string; }) => item.title.toLowerCase() === filteredTitle.toLowerCase());
+            getMetacriticInformation.cache[filteredTitle] = result;
+        }
+        return result;
+    };
+
+    getMetacriticInformation.cache = {} as Cache;
+
+    const findGameTitle = (item: HLTBInfo, filteredTitle: string) => {
+        return item.game_name.toLowerCase() === filteredTitle.toLowerCase();
+    };
+
+    const findGameInAliases = (item: HLTBInfo, filteredTitle: string) => {
+        return item.game_alias.split(', ').map(alias => alias.toLowerCase()).find(alias => alias === filteredTitle.toLowerCase());
+    };
 
     const getPlayTimeInHoursAndMinutes = (gameTime: number) => {
         const gameTimeInHours = gameTime / 3600;
@@ -241,7 +166,8 @@ const ListItem = ({ item, type }: { item: Game, type: string }) => {
 
                                 }
                                 {item.metacriticInfo ? <Text style={[styles.metacritic,
-                                    getMetacriticScoreColor(Number(item.metacriticInfo.metacriticScore))]}>{item.metacriticInfo.metacriticScore}</Text> : null}
+                                        getMetacriticScoreColor(Number(item.metacriticInfo.metacriticScore))]}>{item.metacriticInfo.metacriticScore}</Text> :
+                                    <Text>{item.metacriticInfo}</Text>}
                             </View>
                             <View style={styles.line}>
                                 <View style={styles.inline}>
@@ -284,7 +210,7 @@ const ListItem = ({ item, type }: { item: Game, type: string }) => {
                                                         : null}
                                                 </View>
                                             </View>
-                                        ) : null
+                                        ) : <Text>GEEN HLTB</Text>
                                     }</View>) : null
                                 }
                             </View>
@@ -293,8 +219,8 @@ const ListItem = ({ item, type }: { item: Game, type: string }) => {
             }
         </View>
     );
-};
-export default memo(ListItem);
+});
+export default ListItem;
 
 const styles = StyleSheet.create({
     loading: {
@@ -318,29 +244,6 @@ const styles = StyleSheet.create({
         height: '100%',
         zIndex: 1000,
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    },
-    completionStatusesMenu: {
-        display: 'flex',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0)',
-    },
-    completionStatusesMenuTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        padding: 6,
-        borderBottomWidth: 2,
-        borderStyle: 'solid',
-        borderColor: '#ffffff',
-    },
-    completionStatusesMenuItem: {
-        margin: 8,
-        fontSize: 15,
-        fontWeight: 'bold',
-        backgroundColor: 'rgba(0, 0, 0, 0)',
-    },
-    completionStatusesMenuItemText: {
-        fontSize: 17,
-        fontWeight: 'bold',
     },
     imageContainer: {
         display: 'flex',
@@ -390,9 +293,6 @@ const styles = StyleSheet.create({
         maxWidth: 272,
 
     },
-    completion: {
-        marginRight: 14,
-    },
     timeToBeatContainer: {
         display: 'flex',
         flexDirection: 'row',
@@ -418,13 +318,5 @@ const styles = StyleSheet.create({
     },
     timeToBeatText: {
         marginLeft: 4,
-    },
-    gameCopy: {
-        marginLeft: 14,
-    },
-    gameCopyBoth: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: 55,
-    },
+    }
 });
