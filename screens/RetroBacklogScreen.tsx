@@ -13,6 +13,8 @@ import { firestore } from '../firebaseConfig';
 import { SortProperty } from '../constants/SortProperty';
 import { GameCopy } from '../constants/GameCopy';
 import { Completion } from '../constants/Completion';
+import { HLTBInfo } from '../types/HLTBInfo';
+import { Cache } from '../interfaces/Cache';
 
 function ButtonContent({ sortBy, sortAscending }: any) {
     return (
@@ -38,34 +40,91 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
 
+    const getRetroBacklogGames = async (fs: Firestore) => {
+        const fullGamesList = collection(fs, 'retro-backlog');
+        const fullGamesListSnapshot = await getDocs(fullGamesList);
+        return fullGamesListSnapshot.docs.map(doc => {
+            const documentId = doc.id;
+            const data = doc.data();
+            return { ...data, documentId };
+        });
+    };
+
+    const sortGamesAlphabetical = (games: any) => {
+        return games.sort((a: any, b: any) => {
+            return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
+                b.title.toLowerCase().localeCompare(a.title.toLowerCase());
+        });
+    };
+
+    const filterCharacters = (title: string): string => {
+        const copyrightSign = String.fromCharCode(169);
+        const registeredSign = String.fromCharCode(174);
+        const trademarkSymbol = String.fromCharCode(8482);
+
+        let filteredTitle = title.split(copyrightSign).join('');
+        filteredTitle = filteredTitle.split(registeredSign).join('');
+        filteredTitle = filteredTitle.split(trademarkSymbol).join('');
+        filteredTitle = filteredTitle.split('Remastered').join('').trim();
+        filteredTitle = filteredTitle.split('+ A NEW POWER AWAKENS SET').join('').trim();
+        filteredTitle = filteredTitle.split(': Duke of Switch Edition').join('').trim();
+        filteredTitle = filteredTitle.split('Commander Keen in ').join('').trim();
+        filteredTitle = filteredTitle.split(': Bundle of Terror').join('').trim();
+        return filteredTitle;
+    };
+
+    const getHLTBInformation = async (title: string): Promise<HLTBInfo | undefined> => {
+        if (getHLTBInformation.cache[title]) {
+            return getHLTBInformation.cache[title];
+        }
+
+        const filteredTitle = filterCharacters(title);
+
+        const gameInformationURL = `https://game-information.vercel.app/how-long-to-beat?title=${filteredTitle}`;
+        const gameInformation = await fetch(gameInformationURL);
+
+        if (!gameInformation) {
+            console.error('HLTB information fetch failed');
+            setIsLoading(false);
+        }
+        if (gameInformation.status === 403) {
+            console.error('HLTB information rate limit');
+            setIsLoading(false);
+        }
+        if (!gameInformation.ok) {
+            console.error('HLTB information request failed');
+            setIsLoading(false);
+        }
+        const response = await gameInformation.json();
+        const result = (response.data as HLTBInfo[]).find((item: HLTBInfo) => (item.game_name === filteredTitle || item.game_alias === filteredTitle));
+
+        getHLTBInformation.cache[filteredTitle] = result;
+        return result;
+    };
+
+    getHLTBInformation.cache = {} as Cache;
+
     useEffect(() => {
         let mounted = true;
 
-        async function getGames(fs: Firestore) {
-            const fullGamesList = collection(fs, 'retro-backlog');
-            const fullGamesListSnapshot = await getDocs(fullGamesList);
-            return fullGamesListSnapshot.docs.map(doc => {
-                const documentId = doc.id;
-                const data = doc.data();
-                return { ...data, documentId };
-            });
-        }
+        async function getRetroBacklog() {
 
-        async function getFullList() {
+            const retroBacklog = await getRetroBacklogGames(firestore);
+            const sortedRetroBacklog = sortGamesAlphabetical(retroBacklog);
 
-            getGames(firestore).then(result => {
-                const backlog: Array<any> = result.sort((a: any, b: any) => {
-                    return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
-                        b.title.toLowerCase().localeCompare(a.title.toLowerCase());
-                });
-                setFullBacklog(backlog);
-                setBacklogData(backlog);
+            await Promise.all(sortedRetroBacklog.map(async (game: Game) => {
+                game.hltbInfo = await getHLTBInformation(game.title);
+            }));
+
+            if (mounted) {
+                setFullBacklog(sortedRetroBacklog);
+                setBacklogData(sortedRetroBacklog);
                 setIsLoading(false);
-            });
+            }
         }
 
         if (mounted) {
-            getFullList();
+            void getRetroBacklog();
         }
 
         return function cleanUp() {
@@ -188,7 +247,7 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
                 </Pressable>
             </View>
             {isLoading ?
-                <ActivityIndicator size="large" color="#fff" /> :
+                <ActivityIndicator style={styles.loadingSpinner} size="large" color="#fff" /> :
                 <FlatList
                     data={backlogData}
                     keyExtractor={(item => item.id.toString())}
@@ -205,8 +264,11 @@ const styles = StyleSheet.create({
     container: {
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         flex: 1,
+    },
+    loadingSpinner: {
+        height: 250,
     },
     list: {
         paddingBottom: 100,

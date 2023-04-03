@@ -14,7 +14,7 @@ export function CompletionStatusesMenuItem({
     const changeStatus = (status: string): void => {
         item.completion = status;
 
-        updateFirebaseDocumentWithStatus(status);
+        void updateFirebaseDocumentWithStatus(status);
         toggleMenu();
     };
 

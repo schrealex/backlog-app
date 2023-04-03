@@ -31,34 +31,46 @@ export default function FullListScreen() {
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
 
+    const getAllTheGames = async (fs: Firestore) => {
+        const fullGamesList = collection(fs, 'full-games-list');
+        const fullGamesListSnapshot = await getDocs(fullGamesList);
+        return fullGamesListSnapshot.docs.map(doc => {
+            const documentId = doc.id;
+            const data = doc.data();
+            return { ...data, documentId };
+        });
+    };
+
+    const sortGamesAlphabetical = (games: any) => {
+        return games.sort((a: any, b: any) => {
+            return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
+                b.title.toLowerCase().localeCompare(a.title.toLowerCase());
+        });
+    };
+
     useEffect(() => {
         let mounted = true;
 
-        async function getGames(fs: Firestore) {
-            const fullGamesList = collection(fs, 'full-games-list');
-            const fullGamesListSnapshot = await getDocs(fullGamesList);
-            return fullGamesListSnapshot.docs.map(doc => {
-                const documentId = doc.id;
-                const data = doc.data();
-                return { ...data, documentId };
-            });
-        }
+        async function getFullListOfGames() {
+            try {
+                const allTheGames = await getAllTheGames(firestore);
+                const sortedGamesList = sortGamesAlphabetical(allTheGames);
 
-        async function getFullList() {
+                if (mounted) {
+                    setFullList(sortedGamesList);
+                    setFullListData(sortedGamesList);
+                    setIsLoading(false);
+                }
 
-            getGames(firestore).then(result => {
-                const fullList: Array<any> = result.sort((a: any, b: any) => {
-                    return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
-                        b.title.toLowerCase().localeCompare(a.title.toLowerCase());
-                });
-                setFullList(fullList);
-                setFullListData(fullList);
-                setIsLoading(false);
-            });
+            } catch (error: any) {
+                if (mounted) {
+                    setIsLoading(false);
+                }
+            }
         }
 
         if (mounted) {
-            getFullList();
+            void getFullListOfGames();
         }
 
         return function cleanUp() {
@@ -170,7 +182,7 @@ export default function FullListScreen() {
                 </Pressable>
             </View>
             {isLoading ?
-                <ActivityIndicator size="large" color="#fff" /> :
+                <ActivityIndicator style={styles.loadingSpinner} size="large" color="#fff" /> :
                 <FlatList
                     data={fullListData}
                     keyExtractor={(item => item.id.toString())}
@@ -186,8 +198,11 @@ const styles = StyleSheet.create({
     container: {
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         flex: 1,
+    },
+    loadingSpinner: {
+        height: 250,
     },
     title: {
         fontSize: 20,

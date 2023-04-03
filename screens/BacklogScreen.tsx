@@ -2,7 +2,6 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
-import ListItem from '../components/ListItem';
 import SortButtonOptions from '../components/SortButtonOptions';
 import { View } from '../components/Themed';
 import { RootTabScreenProps } from '../types';
@@ -15,8 +14,12 @@ import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { Firestore } from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
 
-import * as memoizee from 'memoizee';
+import { HLTBInfo } from '../types/HLTBInfo';
+import { Cache } from '../interfaces/Cache';
+import { MetacriticInfo } from '../types/MetacriticInfo';
+import ListItem from '../components/ListItem';
 
+const memoizee = require('memoizee');
 
 export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlog'>) {
     const [isLoading, setIsLoading] = useState(true);
@@ -25,36 +28,143 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
 
+    const getGameInformation = async (list: Array<Game>) => {
+        const promises = list.map(async (game: Game) => {
+            const [hltbInformation, metacriticInformation] = await Promise.all([
+                getHLTBInformation(game.title),
+                getMetacriticInformation(game.title)
+            ]);
+
+            return {
+                ...game,
+                hltbInfo: hltbInformation,
+                metacriticInfo: metacriticInformation
+            };
+        });
+
+        return Promise.all(promises);
+    };
+
+    const filterCharacters = (title: string): string => {
+        const copyrightSign = String.fromCharCode(169);
+        const registeredSign = String.fromCharCode(174);
+        const trademarkSymbol = String.fromCharCode(8482);
+
+        let filteredTitle = title.split(copyrightSign).join('');
+        filteredTitle = filteredTitle.split(registeredSign).join('');
+        filteredTitle = filteredTitle.split(trademarkSymbol).join('');
+        filteredTitle = filteredTitle.split('Remastered').join('').trim();
+        filteredTitle = filteredTitle.split('+ A NEW POWER AWAKENS SET').join('').trim();
+        filteredTitle = filteredTitle.split(': Duke of Switch Edition').join('').trim();
+        filteredTitle = filteredTitle.split('Commander Keen in ').join('').trim();
+        filteredTitle = filteredTitle.split(': Bundle of Terror').join('').trim();
+        return filteredTitle;
+    };
+
+    const getHLTBInformation = async (title: string): Promise<HLTBInfo | undefined> => {
+        if (getHLTBInformation.cache[title]) {
+            return getHLTBInformation.cache[title];
+        }
+
+        const filteredTitle = filterCharacters(title);
+
+        const gameInformationURL = `https://game-information.vercel.app/how-long-to-beat?title=${filteredTitle}`;
+        const gameInformation = await fetch(gameInformationURL);
+
+        if (!gameInformation) {
+            console.error('HLTB information fetch failed');
+            setIsLoading(false);
+        }
+        if (gameInformation.status === 403) {
+            console.error('HLTB information rate limit');
+            setIsLoading(false);
+        }
+        if (!gameInformation.ok) {
+            console.error('HLTB information request failed');
+            setIsLoading(false);
+        }
+        const response = await gameInformation.json();
+        const result = (response.data as HLTBInfo[]).find((item: HLTBInfo) => (item.game_name === filteredTitle || item.game_alias === filteredTitle));
+
+        getHLTBInformation.cache[filteredTitle] = result;
+        return result;
+    };
+
+    getHLTBInformation.cache = {} as Cache;
+
+    const getMetacriticInformation = async (title: string): Promise<MetacriticInfo> => {
+        if (getMetacriticInformation.cache[title]) {
+            return getMetacriticInformation.cache[title];
+        }
+
+        let filteredTitle = filterCharacters(title);
+
+        const metacriticInformationURL = `https://game-information.vercel.app/metacritic?title=${filteredTitle.replace('+', '%2B')}&type=BACKLOG`;
+        const metacriticInformation = await fetch(metacriticInformationURL);
+
+        if (!metacriticInformation) {
+            console.log('Metacritic information fetch failed');
+        }
+        if (metacriticInformation.status === 403) {
+            console.log('Metacritic information rate limit');
+        }
+        if (!metacriticInformation.ok) {
+            console.log('Metacritic information request failed');
+        }
+        const response = await metacriticInformation.json();
+        let result;
+        if (response && response.name !== 'TimeoutError') {
+            result = response.find((item: { title: string; }) => item.title.toLowerCase() === filteredTitle.toLowerCase());
+            getMetacriticInformation.cache[title] = result;
+        }
+        return result;
+    };
+
+    getMetacriticInformation.cache = {} as Cache;
+
+    const getBacklogGames = async (fs: Firestore) => {
+        const fullGamesList = collection(fs, 'full-games-list');
+        const whereQuery = query(fullGamesList, where('completion', 'not-in', ['Beaten', 'Completed', 'Continuous', 'Dropped']));
+        const fullGamesListSnapshot = await getDocs(whereQuery);
+        return fullGamesListSnapshot.docs.map(doc => {
+            const documentId = doc.id;
+            const data = doc.data();
+            return { ...data, documentId };
+        });
+    };
+
+    const sortBacklogAlphabetical = (backlog: any) => {
+        return backlog.sort((a: any, b: any) => {
+            return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
+                b.title.toLowerCase().localeCompare(a.title.toLowerCase());
+        });
+    };
+
     useEffect(() => {
         let mounted = true;
 
-        async function getGames(fs: Firestore) {
-            const fullGamesList = collection(fs, 'full-games-list');
-            const whereQuery = query(fullGamesList, where('completion', 'not-in', ['Beaten', 'Completed', 'Continuous', 'Dropped']));
-            const fullGamesListSnapshot = await getDocs(whereQuery);
-            return fullGamesListSnapshot.docs.map(doc => {
-                const documentId = doc.id;
-                const data = doc.data();
-                return { ...data, documentId };
-            });
-        }
 
+        async function getBacklog() {
+            try {
+                const backlog = await getBacklogGames(firestore);
+                const sortedBacklog = sortBacklogAlphabetical(backlog);
+                const backlogWithAdditionalInformation = await getGameInformation(sortedBacklog);
 
-        async function getFullList() {
+                if (mounted) {
+                    setFullBacklog(backlogWithAdditionalInformation);
+                    setBacklogData(backlogWithAdditionalInformation);
+                    setIsLoading(false);
+                }
 
-            getGames(firestore).then(result => {
-                const backlog: Array<any> = result.sort((a: any, b: any) => {
-                    return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
-                        b.title.toLowerCase().localeCompare(a.title.toLowerCase());
-                });
-                setFullBacklog(backlog);
-                setBacklogData(backlog);
-                setIsLoading(false);
-            });
+            } catch (error: any) {
+                if (mounted) {
+                    setIsLoading(false);
+                }
+            }
         }
 
         if (mounted) {
-            getFullList();
+            void getBacklog();
         }
 
         return function cleanUp() {
@@ -209,7 +319,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
                 </Pressable>
             </View>
             {isLoading ?
-                <ActivityIndicator size="large" color="#fff" /> :
+                <ActivityIndicator style={styles.loadingSpinner} size="large" color="#fff" /> :
                 <FlatList
                     removeClippedSubviews
                     data={backlogData}
@@ -221,6 +331,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
                         <ListItem item={item} type={'BACKLOG'} />
                     )}
                 />}
+
         </View>
     );
 }
@@ -229,8 +340,11 @@ const styles = StyleSheet.create({
     container: {
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         flex: 1,
+    },
+    loadingSpinner: {
+        height: 250,
     },
     list: {
         width: '100%',
