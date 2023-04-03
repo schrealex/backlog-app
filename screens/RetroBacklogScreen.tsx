@@ -6,30 +6,27 @@ import ListItem from '../components/ListItem';
 import { View } from '../components/Themed';
 import { RootTabScreenProps } from '../types';
 import { Game } from '../types/Game';
-import { completion, gameCopy } from '../constants/FULL_GAMES_LIST';
 
 import { collection, getDocs } from 'firebase/firestore/lite';
 import { Firestore } from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
-
-const sortProperty = {
-    ALPHABETICAL: 'Alphabetical',
-    HLTB: 'Hltb'
-};
+import { SortProperty } from '../constants/SortProperty';
+import { GameCopy } from '../constants/GameCopy';
+import { Completion } from '../constants/Completion';
 
 function ButtonContent({ sortBy, sortAscending }: any) {
     return (
         <View style={styles.buttonContent}>
-            {sortBy === sortProperty.ALPHABETICAL && sortAscending ?
+            {sortBy === SortProperty.ALPHABETICAL && sortAscending ?
                 <FontAwesome5 name="sort-alpha-down" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === sortProperty.ALPHABETICAL && !sortAscending ?
+            {sortBy === SortProperty.ALPHABETICAL && !sortAscending ?
                 <FontAwesome5 name="sort-alpha-down-alt" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === sortProperty.HLTB && !sortAscending ?
+            {sortBy === SortProperty.HLTB && !sortAscending ?
                 <FontAwesome5 name="sort-amount-down" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === sortProperty.HLTB && sortAscending ?
+            {sortBy === SortProperty.HLTB && sortAscending ?
                 <FontAwesome5 name="sort-amount-down-alt" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
             <Text
-                style={styles.buttonText}>{sortBy === sortProperty.ALPHABETICAL ? 'Sort Alphabetical' : sortBy === sortProperty.HLTB ? 'Sort by HLTB' : ''}</Text>
+                style={styles.buttonText}>{sortBy === SortProperty.ALPHABETICAL ? 'Sort Alphabetical' : sortBy === SortProperty.HLTB ? 'Sort by HLTB' : ''}</Text>
         </View>
     );
 }
@@ -39,7 +36,7 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
     const [backlogData, setBacklogData] = useState<Game[]>([]);
     const [fullBacklog, setFullBacklog] = useState<Game[]>([]);
     const [sortAscending, setSortAscending] = useState(true);
-    const [sortBy, setSortBy] = useState(sortProperty.ALPHABETICAL);
+    const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
 
     useEffect(() => {
         let mounted = true;
@@ -77,9 +74,9 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
     }, []);
 
     useEffect(() => {
-        if (sortBy === sortProperty.ALPHABETICAL) {
+        if (sortBy === SortProperty.ALPHABETICAL) {
             sortAlphabetical();
-        } else if (sortBy === sortProperty.HLTB) {
+        } else if (sortBy === SortProperty.HLTB) {
             sortByHLTB();
         }
     }, [sortBy, sortAscending]);
@@ -109,33 +106,33 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
     };
 
     const getOnlyPhysical = () => {
-        return fullBacklog.filter((game: any) => game.gameCopy.includes(gameCopy.PHYSICAL));
+        return fullBacklog.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
     };
 
     const getOnlyDigital = () => {
-        return fullBacklog.filter((game: any) => game.gameCopy.includes(gameCopy.DIGITAL));
+        return fullBacklog.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
     };
 
     const getPlaying = () => {
-        return fullBacklog.filter((game: any) => game.completion === completion.UNFINISHED);
+        return fullBacklog.filter((game: any) => game.completion === Completion.UNFINISHED);
     };
 
     const getPaused = () => {
-        return fullBacklog.filter((game: any) => game.completion === completion.PAUSED);
+        return fullBacklog.filter((game: any) => game.completion === Completion.PAUSED);
     };
 
     const toggleSort = () => {
-        if (sortBy === sortProperty.ALPHABETICAL && sortAscending) {
-            setSortBy(sortProperty.ALPHABETICAL);
+        if (sortBy === SortProperty.ALPHABETICAL && sortAscending) {
+            setSortBy(SortProperty.ALPHABETICAL);
             setSortAscending(false);
-        } else if (sortBy === sortProperty.ALPHABETICAL && !sortAscending) {
-            setSortBy(sortProperty.HLTB);
+        } else if (sortBy === SortProperty.ALPHABETICAL && !sortAscending) {
+            setSortBy(SortProperty.HLTB);
             setSortAscending(true);
-        } else if (sortBy === sortProperty.HLTB && sortAscending) {
-            setSortBy(sortProperty.HLTB);
+        } else if (sortBy === SortProperty.HLTB && sortAscending) {
+            setSortBy(SortProperty.HLTB);
             setSortAscending(false);
-        } else if (sortBy === sortProperty.HLTB && !sortAscending) {
-            setSortBy(sortProperty.ALPHABETICAL);
+        } else if (sortBy === SortProperty.HLTB && !sortAscending) {
+            setSortBy(SortProperty.ALPHABETICAL);
             setSortAscending(true);
         }
     };

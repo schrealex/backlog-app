@@ -2,26 +2,24 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text } from 'react-
 import { View } from '../components/Themed';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { completion, gameCopy } from '../constants/FULL_GAMES_LIST';
 import ListItem from '../components/ListItem';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Firestore } from 'firebase/firestore';
 import { collection, getDocs } from 'firebase/firestore/lite';
 import { firestore } from '../firebaseConfig';
-
-const sortProperty = {
-    ALPHABETICAL: 'Alphabetical'
-};
+import { SortProperty } from '../constants/SortProperty';
+import { GameCopy } from '../constants/GameCopy';
+import { Completion } from '../constants/Completion';
 
 function ButtonContent({ sortBy, sortAscending }: any) {
     return (
         <View style={styles.buttonContent}>
-            {sortBy === sortProperty.ALPHABETICAL && sortAscending ?
+            {sortBy === SortProperty.ALPHABETICAL && sortAscending ?
                 <FontAwesome5 name="sort-alpha-down" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === sortProperty.ALPHABETICAL && !sortAscending ?
+            {sortBy === SortProperty.ALPHABETICAL && !sortAscending ?
                 <FontAwesome5 name="sort-alpha-down-alt" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
             <Text
-                style={styles.buttonText}>{sortBy === sortProperty.ALPHABETICAL ? 'Sort Alphabetical' : ''}</Text>
+                style={styles.buttonText}>{sortBy === SortProperty.ALPHABETICAL ? 'Sort Alphabetical' : ''}</Text>
         </View>
     );
 }
@@ -31,7 +29,7 @@ export default function FullListScreen() {
     const [fullList, setFullList]: Array<any> = useState([]);
     const [fullListData, setFullListData]: Array<any> = useState([]);
     const [sortAscending, setSortAscending] = useState(true);
-    const [sortBy, setSortBy] = useState(sortProperty.ALPHABETICAL);
+    const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
 
     useEffect(() => {
         let mounted = true;
@@ -97,32 +95,32 @@ export default function FullListScreen() {
     };
 
     const getOnlyPhysical = () => {
-        return fullList.filter((game: any) => game.gameCopy.includes(gameCopy.PHYSICAL));
+        return fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
     };
 
     const getOnlyDigital = () => {
-        return fullList.filter((game: any) => game.gameCopy.includes(gameCopy.DIGITAL));
+        return fullList.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
     };
 
     const getDropped = () => {
-        return fullList.filter((game: any) => game.completion === completion.DROPPED);
+        return fullList.filter((game: any) => game.completion === Completion.DROPPED);
     };
 
     const getBeaten = () => {
-        return fullList.filter((game: any) => game.completion === completion.BEATEN);
+        return fullList.filter((game: any) => game.completion === Completion.BEATEN);
     };
 
     const getCompleted = () => {
-        return fullList.filter((game: any) => game.completion === completion.COMPLETED);
+        return fullList.filter((game: any) => game.completion === Completion.COMPLETED);
     };
 
     const toggleSort = () => {
-        if (sortBy === sortProperty.ALPHABETICAL && sortAscending) {
-            setSortBy(sortProperty.ALPHABETICAL);
+        if (sortBy === SortProperty.ALPHABETICAL && sortAscending) {
+            setSortBy(SortProperty.ALPHABETICAL);
             setSortAscending(false);
             sortAlphabetical();
-        } else if (sortBy === sortProperty.ALPHABETICAL && !sortAscending) {
-            setSortBy(sortProperty.ALPHABETICAL);
+        } else if (sortBy === SortProperty.ALPHABETICAL && !sortAscending) {
+            setSortBy(SortProperty.ALPHABETICAL);
             setSortAscending(true);
             sortAlphabetical();
         }

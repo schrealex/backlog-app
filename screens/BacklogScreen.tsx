@@ -3,48 +3,27 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import ListItem from '../components/ListItem';
+import SortButtonOptions from '../components/SortButtonOptions';
 import { View } from '../components/Themed';
 import { RootTabScreenProps } from '../types';
+import { SortProperty } from '../constants/SortProperty';
+import { Completion } from '../constants/Completion';
 import { Game } from '../types/Game';
-import { completion, FULL_GAMES_LIST, gameCopy } from '../constants/FULL_GAMES_LIST';
+import { GameCopy } from '../constants/GameCopy';
 
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore/lite';
+import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { Firestore } from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
 
-const sortProperty = {
-    ALPHABETICAL: 'Alphabetical',
-    HLTB: 'Hltb',
-    METACRITIC: 'Metacritic'
-};
+import * as memoizee from 'memoizee';
 
-function ButtonContent({ sortBy, sortAscending }: any) {
-    return (
-        <View style={styles.buttonContent}>
-            {sortBy === sortProperty.ALPHABETICAL && sortAscending ?
-                <FontAwesome5 name="sort-alpha-down" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === sortProperty.ALPHABETICAL && !sortAscending ?
-                <FontAwesome5 name="sort-alpha-down-alt" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === sortProperty.HLTB && !sortAscending ?
-                <FontAwesome5 name="sort-amount-down" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === sortProperty.HLTB && sortAscending ?
-                <FontAwesome5 name="sort-amount-down-alt" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === sortProperty.METACRITIC && !sortAscending ?
-                <FontAwesome5 name="sort-numeric-down-alt" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === sortProperty.METACRITIC && sortAscending ?
-                <FontAwesome5 name="sort-numeric-down" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            <Text
-                style={styles.buttonText}>{sortBy === sortProperty.ALPHABETICAL ? 'Sort Alphabetical' : sortBy === sortProperty.HLTB ? 'Sort by HLTB' : sortBy === sortProperty.METACRITIC ? 'Sort by Metacritic' : ''}</Text>
-        </View>
-    );
-}
 
 export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlog'>) {
     const [isLoading, setIsLoading] = useState(true);
     const [backlogData, setBacklogData] = useState<Game[]>([]);
     const [fullBacklog, setFullBacklog] = useState<Game[]>([]);
     const [sortAscending, setSortAscending] = useState(true);
-    const [sortBy, setSortBy] = useState(sortProperty.ALPHABETICAL);
+    const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
 
     useEffect(() => {
         let mounted = true;
@@ -60,24 +39,6 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
             });
         }
 
-
-        async function updateWishList(fs: any) {
-            // const wishlist = collection(fs, 'wish-list-games');
-            const fullGamesList = collection(fs, 'full-games-list');
-            await FULL_GAMES_LIST.forEach(game => {
-                addDoc(fullGamesList, game).then(r => {
-                    console.log({ r });
-                }).catch(error => {
-                    console.log(error);
-                });
-            });
-        }
-
-        // updateWishList(firestore).then(result => {
-        //     console.log({ result });
-        // }).catch(error => {
-        //     console.log(error);
-        // });
 
         async function getFullList() {
 
@@ -102,11 +63,11 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
     }, []);
 
     useEffect(() => {
-        if (sortBy === sortProperty.ALPHABETICAL) {
+        if (sortBy === SortProperty.ALPHABETICAL) {
             sortAlphabetical();
-        } else if (sortBy === sortProperty.HLTB) {
+        } else if (sortBy === SortProperty.HLTB) {
             sortByHLTB();
-        } else if (sortBy === sortProperty.METACRITIC) {
+        } else if (sortBy === SortProperty.METACRITIC) {
             sortByMetacritic();
         }
     }, [sortBy, sortAscending]);
@@ -136,44 +97,44 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         resetSort();
     };
 
-    const getAll = () => {
+    const getAll = memoizee(() => {
         return fullBacklog;
-    };
+    });
 
-    const getOnlyPhysical = () => {
-        return fullBacklog.filter((game: any) => game.gameCopy.includes(gameCopy.PHYSICAL));
-    };
+    const getOnlyPhysical = memoizee(() => {
+        return fullBacklog.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
+    });
 
-    const getOnlyDigital = () => {
-        return fullBacklog.filter((game: any) => game.gameCopy.includes(gameCopy.DIGITAL));
-    };
+    const getOnlyDigital = memoizee(() => {
+        return fullBacklog.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
+    });
 
-    const getPlaying = () => {
-        return fullBacklog.filter((game: any) => game.completion === completion.UNFINISHED);
-    };
+    const getPlaying = memoizee(() => {
+        return fullBacklog.filter((game: any) => game.completion === Completion.UNFINISHED);
+    }, []);
 
-    const getPaused = () => {
-        return fullBacklog.filter((game: any) => game.completion === completion.PAUSED);
-    };
+    const getPaused = memoizee(() => {
+        return fullBacklog.filter((game: any) => game.completion === Completion.PAUSED);
+    });
 
     const toggleSort = () => {
-        if (sortBy === sortProperty.ALPHABETICAL && sortAscending) {
-            setSortBy(sortProperty.ALPHABETICAL);
+        if (sortBy === SortProperty.ALPHABETICAL && sortAscending) {
+            setSortBy(SortProperty.ALPHABETICAL);
             setSortAscending(false);
-        } else if (sortBy === sortProperty.ALPHABETICAL && !sortAscending) {
-            setSortBy(sortProperty.HLTB);
+        } else if (sortBy === SortProperty.ALPHABETICAL && !sortAscending) {
+            setSortBy(SortProperty.HLTB);
             setSortAscending(true);
-        } else if (sortBy === sortProperty.HLTB && sortAscending) {
-            setSortBy(sortProperty.HLTB);
+        } else if (sortBy === SortProperty.HLTB && sortAscending) {
+            setSortBy(SortProperty.HLTB);
             setSortAscending(false);
-        } else if (sortBy === sortProperty.HLTB && !sortAscending) {
-            setSortBy(sortProperty.METACRITIC);
+        } else if (sortBy === SortProperty.HLTB && !sortAscending) {
+            setSortBy(SortProperty.METACRITIC);
             setSortAscending(true);
-        } else if (sortBy === sortProperty.METACRITIC && sortAscending) {
-            setSortBy(sortProperty.METACRITIC);
+        } else if (sortBy === SortProperty.METACRITIC && sortAscending) {
+            setSortBy(SortProperty.METACRITIC);
             setSortAscending(false);
-        } else if (sortBy === sortProperty.METACRITIC && !sortAscending) {
-            setSortBy(sortProperty.ALPHABETICAL);
+        } else if (sortBy === SortProperty.METACRITIC && !sortAscending) {
+            setSortBy(SortProperty.ALPHABETICAL);
             setSortAscending(true);
         }
     };
@@ -216,14 +177,14 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
 
     const resetSort = () => {
         setSortAscending(true);
-        setSortBy(sortProperty.ALPHABETICAL);
+        setSortBy(SortProperty.ALPHABETICAL);
     };
 
     return (
         <View style={styles.container}>
             <View style={styles.buttonGroup}>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, styles.largeButton]} onPress={toggleSort}>
-                    <ButtonContent sortBy={sortBy} sortAscending={sortAscending} />
+                    <SortButtonOptions sortBy={sortBy} sortAscending={sortAscending} />
                 </Pressable>
             </View>
             <View style={styles.buttonGroup}>

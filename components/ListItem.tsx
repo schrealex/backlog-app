@@ -167,7 +167,7 @@ const ListItem = React.memo(({ item, type }: { item: Game, type: string }) => {
                                 }
                                 {item.metacriticInfo ? <Text style={[styles.metacritic,
                                         getMetacriticScoreColor(Number(item.metacriticInfo.metacriticScore))]}>{item.metacriticInfo.metacriticScore}</Text> :
-                                    <Text>{item.metacriticInfo}</Text>}
+                                    null}
                             </View>
                             <View style={styles.line}>
                                 <View style={styles.inline}>
@@ -210,7 +210,7 @@ const ListItem = React.memo(({ item, type }: { item: Game, type: string }) => {
                                                         : null}
                                                 </View>
                                             </View>
-                                        ) : <Text>GEEN HLTB</Text>
+                                        ) : null
                                     }</View>) : null
                                 }
                             </View>
