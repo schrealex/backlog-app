@@ -5,22 +5,22 @@ import { Game } from '../types/Game';
 import { CompletionStatusesMenuItem } from './CompletionStatusesMenuItem';
 import { Completion } from '../constants/Completion';
 
-export function CompletionStatusesMenu({ type, item, toggleMenu }: { type: string, item: Game, toggleMenu: any }) {
+export function CompletionStatusesMenu({ type, item, onClick }: { type: string, item: Game, onClick: any }) {
     return (
         <View style={styles.completionStatusesMenu}>
             <Text style={styles.completionStatusesMenuTitle}>Change completion status</Text>
             {item.completion !== Completion.NOT_STARTED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={Completion.NOT_STARTED} /> : null}
-            {item.completion !== Completion.UNFINISHED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={Completion.UNFINISHED} /> : null}
+                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.NOT_STARTED} /> : null}
+            {item.completion !== Completion.PLAYING ?
+                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.PLAYING} /> : null}
             {item.completion !== Completion.PAUSED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={Completion.PAUSED} /> : null}
+                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.PAUSED} /> : null}
             {item.completion !== Completion.DROPPED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={Completion.DROPPED} /> : null}
+                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.DROPPED} /> : null}
             {item.completion !== Completion.BEATEN ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={Completion.BEATEN} /> : null}
+                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.BEATEN} /> : null}
             {item.completion !== Completion.COMPLETED ?
-                <CompletionStatusesMenuItem type={type} item={item} toggleMenu={toggleMenu} completionStatus={Completion.COMPLETED} /> : null}
+                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.COMPLETED} /> : null}
         </View>
     );
 }

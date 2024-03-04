@@ -9,12 +9,12 @@ export function GameCopyElement({ gameCopyType }: { gameCopyType: Array<string> 
         <View style={styles.gameCopy}>
             {gameCopyType.includes(GameCopy.PHYSICAL) && gameCopyType.includes(GameCopy.DIGITAL) ?
                 <View style={styles.gameCopyBoth}>
-                    <FontAwesome5 name="compact-disc" size={20} color="red" />
-                    <FontAwesome5 name="hdd" size={20} color="red" />
+                    <FontAwesome5 name="sd-card" size={20} color="red" />
+                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" />
                 </View>
                 : gameCopyType.includes(GameCopy.PHYSICAL) ?
-                    <FontAwesome5 name="compact-disc" size={20} color="red" /> :
-                    <FontAwesome5 name="hdd" size={20} color="red" />
+                    <FontAwesome5 name="sd-card" size={20} color="red" /> :
+                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" />
             }
         </View>
     );

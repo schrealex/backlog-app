@@ -173,7 +173,7 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
     };
 
     const getPlaying = () => {
-        return fullBacklog.filter((game: any) => game.completion === Completion.UNFINISHED);
+        return fullBacklog.filter((game: any) => game.completion === Completion.PLAYING);
     };
 
     const getPaused = () => {
@@ -218,6 +218,18 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
         setBacklogData(sortedList);
     };
 
+    const onClick = (clickedItemId: number): void => {
+        const updatedList = backlogData.map((item: Game) => {
+
+            if (item.id === clickedItemId) {
+                return { ...item, isMenuOpen: !item.isMenuOpen };
+            } else {
+                return { ...item, isMenuOpen: false };
+            }
+        });
+        setBacklogData(updatedList);
+    }
+
     return (
         <View style={styles.container}>
             <View style={styles.buttonGroup}>
@@ -230,11 +242,11 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
                     <Text style={styles.buttonText}>All [{getAll().length}]</Text>
                 </Pressable>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPhysical}>
-                    <FontAwesome5 name="compact-disc" size={20} color="red" style={{ paddingRight: 5 }} />
+                    <FontAwesome5 name="sd-card" size={20} color="red" style={{ paddingRight: 5 }} />
                     <Text style={styles.buttonText}>[{getOnlyPhysical().length}]</Text>
                 </Pressable>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isDigital}>
-                    <FontAwesome5 name="hdd" size={20} color="red" style={{ paddingRight: 5 }} /><Text
+                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} /><Text
                     style={styles.buttonText}>[{getOnlyDigital().length}]</Text>
                 </Pressable>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPlaying}>
@@ -253,7 +265,7 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
                     keyExtractor={(item => item.id.toString())}
                     style={styles.list}
                     renderItem={({ item }) => (
-                        <ListItem item={item} type={'RETRO_BACKLOG'} />
+                        <ListItem item={item} type={'RETRO_BACKLOG'} isOpen={item.isMenuOpen} onClick={() => onClick(item.id)} />
                     )}
                 />}
         </View>

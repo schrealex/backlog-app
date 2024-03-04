@@ -19,6 +19,8 @@ import FullListScreen from '../screens/FullListScreen';
 import { RootStackParamList, RootTabParamList, RootTabScreenProps } from '../types';
 import LinkingConfiguration from './LinkingConfiguration';
 import RetroBacklogScreen from '../screens/RetroBacklogScreen';
+import FinishedListScreen from "../screens/FinishedListScreen";
+import RandomSuggestionScreen from '../screens/RandomSuggestionScreen';
 
 export default function Navigation({ colorScheme }: { colorScheme: ColorSchemeName }) {
     return (
@@ -95,6 +97,14 @@ function BottomTabNavigator() {
                 }}
             />
             <BottomTab.Screen
+                name="Finished"
+                component={FinishedListScreen}
+                options={{
+                    title: 'Finished',
+                    tabBarIcon: ({ color }) => <FontAwesome5 name="flag-checkered" color={color} size={25} />,
+                }}
+            />
+            <BottomTab.Screen
                 name="RetroBacklog"
                 component={RetroBacklogScreen}
                 options={{
@@ -102,16 +112,14 @@ function BottomTabNavigator() {
                     tabBarIcon: ({ color }) => <FontAwesome5 name="history" color={color} size={25} />,
                 }}
             />
+            <BottomTab.Screen
+                name="RandomSuggestion"
+                component={RandomSuggestionScreen}
+                options={{
+                    title: 'Backlog suggestion',
+                    tabBarIcon: ({ color }) => <FontAwesome5 name="random" color={color} size={25} />,
+                }}
+            />
         </BottomTab.Navigator>
     );
-}
-
-/**
- * You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
- */
-function TabBarIcon(props: {
-    name: React.ComponentProps<typeof FontAwesome>['name'];
-    color: string;
-}) {
-    return <FontAwesome size={30} style={{ marginBottom: -3 }} {...props} />;
 }

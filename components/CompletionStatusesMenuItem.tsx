@@ -4,18 +4,13 @@ import { doc, updateDoc } from 'firebase/firestore/lite';
 import { firestore } from '../firebaseConfig';
 import { Text } from './Themed';
 
-export function CompletionStatusesMenuItem({
-                                               type,
-                                               item,
-                                               completionStatus,
-                                               toggleMenu
-                                           }: { type: string, item: any, completionStatus: string, toggleMenu: any }) {
+export function CompletionStatusesMenuItem({ type, item, completionStatus, onClick }: { type: string, item: any, completionStatus: string, onClick: any }) {
 
     const changeStatus = (status: string): void => {
         item.completion = status;
 
         void updateFirebaseDocumentWithStatus(status);
-        toggleMenu();
+        onClick();
     };
 
     const updateFirebaseDocumentWithStatus = async (status: string) => {
@@ -24,10 +19,10 @@ export function CompletionStatusesMenuItem({
         updateDoc(documentReference, {
             completion: status
         })
-            .then()
-            .catch(error => {
-                console.log(error);
-            });
+        .then()
+        .catch(error => {
+            console.log(error);
+        });
     };
 
     return (

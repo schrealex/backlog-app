@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import ListItem from '../components/ListItem';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Firestore } from 'firebase/firestore';
-import { collection, getDocs } from 'firebase/firestore/lite';
+import {collection, getDocs, query, where} from 'firebase/firestore/lite';
 import { firestore } from '../firebaseConfig';
 import { SortProperty } from '../constants/SortProperty';
 import { GameCopy } from '../constants/GameCopy';
@@ -25,7 +25,7 @@ function ButtonContent({ sortBy, sortAscending }: any) {
     );
 }
 
-export default function FullListScreen() {
+export default function FinishedListScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [fullList, setFullList]: Array<any> = useState([]);
     const [fullListData, setFullListData]: Array<any> = useState([]);
@@ -34,7 +34,8 @@ export default function FullListScreen() {
 
     const getAllTheGames = async (fs: Firestore) => {
         const fullGamesList = collection(fs, 'full-games-list');
-        const fullGamesListSnapshot = await getDocs(fullGamesList);
+        const whereQuery = query(fullGamesList, where('completion', 'in', ['Beaten', 'Completed']));
+        const fullGamesListSnapshot = await getDocs(whereQuery);
         return fullGamesListSnapshot.docs.map(doc => {
             const documentId = doc.id;
             const data = doc.data();
@@ -95,10 +96,6 @@ export default function FullListScreen() {
         setFullListData(getBoth());
     };
 
-    const isDropped = () => {
-        setFullListData(getDropped());
-    };
-
     const isBeaten = () => {
         setFullListData(getBeaten());
     };
@@ -121,10 +118,6 @@ export default function FullListScreen() {
 
     const getBoth = () => {
         return fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL) && game.gameCopy.includes(GameCopy.DIGITAL));
-    };
-
-    const getDropped = () => {
-        return fullList.filter((game: any) => game.completion === Completion.DROPPED);
     };
 
     const getBeaten = () => {
@@ -193,10 +186,6 @@ export default function FullListScreen() {
                 </Pressable>
             </View>
             <View style={styles.buttonGroup}>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isDropped}>
-                    <FontAwesome5 name="times" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getDropped().length}]</Text>
-                </Pressable>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isBeaten}>
                     <FontAwesome5 name="fist-raised" size={20} color="red" style={{ paddingRight: 5 }} /><Text
                     style={styles.buttonText}>[{getBeaten().length}]</Text>
@@ -212,7 +201,7 @@ export default function FullListScreen() {
                     data={fullListData}
                     keyExtractor={(item => item.id.toString())}
                     renderItem={({ item }) => (
-                        <ListItem item={item} type={'FULL_LIST'} isOpen={item.isMenuOpen} onClick={() => onClick(item.id)} />
+                        <ListItem item={item} type={'FULL_LIST'} isOpen={item.isMenuOpen} onClick={() => onClick(item.id)}  />
                     )}
                 />}
         </View>

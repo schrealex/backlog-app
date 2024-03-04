@@ -41,7 +41,6 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
                 metacriticInfo: metacriticInformation
             };
         });
-
         return Promise.all(promises);
     };
 
@@ -58,6 +57,8 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         filteredTitle = filteredTitle.split(': Duke of Switch Edition').join('').trim();
         filteredTitle = filteredTitle.split('Commander Keen in ').join('').trim();
         filteredTitle = filteredTitle.split(': Bundle of Terror').join('').trim();
+        filteredTitle = filteredTitle.split(' — Complete Edition').join('').trim();
+        filteredTitle = filteredTitle.split(' - The End of YoRHa Edition').join('').trim();
         return filteredTitle;
     };
 
@@ -68,7 +69,8 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
 
         const filteredTitle = filterCharacters(title);
 
-        const gameInformationURL = `https://game-information.vercel.app/how-long-to-beat?title=${filteredTitle}`;
+        const gameInformationURL = `https://game-information.vercel.app/how-long-to-beat?title=${encodeURIComponent(filteredTitle)}`;
+        // const gameInformationURL = `http://localhost:3000/how-long-to-beat?title=${encodeURIComponent(filteredTitle)}`;
         const gameInformation = await fetch(gameInformationURL);
 
         if (!gameInformation) {
@@ -84,7 +86,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
             setIsLoading(false);
         }
         const response = await gameInformation.json();
-        const result = (response.data as HLTBInfo[]).find((item: HLTBInfo) => (item.game_name === filteredTitle || item.game_alias === filteredTitle));
+        const result = (response.data as HLTBInfo[]).find((item: HLTBInfo) => (item.game_name.toLowerCase() === filteredTitle.toLowerCase() || item.game_alias.toLowerCase() === filteredTitle.toLowerCase()));
 
         getHLTBInformation.cache[filteredTitle] = result;
         return result;
@@ -143,7 +145,6 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
     useEffect(() => {
         let mounted = true;
 
-
         async function getBacklog() {
             try {
                 const backlog = await getBacklogGames(firestore);
@@ -152,7 +153,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
 
                 if (mounted) {
                     setFullBacklog(backlogWithAdditionalInformation);
-                    setBacklogData(backlogWithAdditionalInformation);
+                    setBacklogData(getPlaying(backlogWithAdditionalInformation));
                     setIsLoading(false);
                 }
 
@@ -183,27 +184,27 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
     }, [sortBy, sortAscending]);
 
     const isAll = () => {
-        setBacklogData(getAll());
+        setBacklogData(getAll(fullBacklog));
         resetSort();
     };
 
     const isPhysical = () => {
-        setBacklogData(getOnlyPhysical());
+        setBacklogData(getOnlyPhysical(fullBacklog));
         resetSort();
     };
 
     const isDigital = () => {
-        setBacklogData(getOnlyDigital());
+        setBacklogData(getOnlyDigital(fullBacklog));
         resetSort();
     };
 
     const isPlaying = () => {
-        setBacklogData(getPlaying());
+        setBacklogData(getPlaying(fullBacklog));
         resetSort();
     };
 
     const isPaused = () => {
-        setBacklogData(getPaused());
+        setBacklogData(getPaused(fullBacklog));
         resetSort();
     };
 
@@ -211,20 +212,20 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         return fullBacklog;
     });
 
-    const getOnlyPhysical = memoizee(() => {
-        return fullBacklog.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
+    const getOnlyPhysical = memoizee((items: Game[]) => {
+        return items.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
     });
 
-    const getOnlyDigital = memoizee(() => {
-        return fullBacklog.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
+    const getOnlyDigital = memoizee((items: Game[]) => {
+        return items.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
     });
 
-    const getPlaying = memoizee(() => {
-        return fullBacklog.filter((game: any) => game.completion === Completion.UNFINISHED);
+    const getPlaying = memoizee((items: Game[]) => {
+        return items.filter((game: any) => game.completion === Completion.PLAYING);
     }, []);
 
-    const getPaused = memoizee(() => {
-        return fullBacklog.filter((game: any) => game.completion === Completion.PAUSED);
+    const getPaused = memoizee((items: Game[]) => {
+        return items.filter((game: any) => game.completion === Completion.PAUSED);
     });
 
     const toggleSort = () => {
@@ -271,7 +272,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         setBacklogData(sortedList);
     };
 
-    const sortByMetacritic = () => {
+    const sortByMetacritic = (): void => {
         const sortedList = [...backlogData].sort((a: any, b: any) => {
             if (a.metacriticInfo && b.metacriticInfo) {
                 if (a.metacriticInfo.metacriticScore && b.metacriticInfo.metacriticScore) {
@@ -290,6 +291,18 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         setSortBy(SortProperty.ALPHABETICAL);
     };
 
+    const onClick = (clickedItemId: number): void => {
+        const updatedList = backlogData.map((item: Game) => {
+
+            if (item.id === clickedItemId) {
+                return { ...item, isMenuOpen: !item.isMenuOpen };
+            } else {
+                return { ...item, isMenuOpen: false };
+            }
+        });
+        setBacklogData(updatedList);
+    }
+
     return (
         <View style={styles.container}>
             <View style={styles.buttonGroup}>
@@ -299,23 +312,23 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
             </View>
             <View style={styles.buttonGroup}>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isAll}>
-                    <Text style={styles.buttonText}>All [{getAll().length}]</Text>
+                    <Text style={styles.buttonText}>All [{getAll(fullBacklog).length}]</Text>
                 </Pressable>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPhysical}>
-                    <FontAwesome5 name="compact-disc" size={20} color="red" style={{ paddingRight: 5 }} />
-                    <Text style={styles.buttonText}>[{getOnlyPhysical().length}]</Text>
+                    <FontAwesome5 name="sd-card" size={20} color="red" style={{ paddingRight: 5 }} />
+                    <Text style={styles.buttonText}>[{getOnlyPhysical(fullBacklog).length}]</Text>
                 </Pressable>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isDigital}>
-                    <FontAwesome5 name="hdd" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getOnlyDigital().length}]</Text>
+                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} /><Text
+                    style={styles.buttonText}>[{getOnlyDigital(fullBacklog).length}]</Text>
                 </Pressable>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPlaying}>
                     <FontAwesome5 name="gamepad" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getPlaying().length}]</Text>
+                    style={styles.buttonText}>[{getPlaying(fullBacklog).length}]</Text>
                 </Pressable>
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPaused}>
                     <FontAwesome5 name="pause" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getPaused().length}]</Text>
+                    style={styles.buttonText}>[{getPaused(fullBacklog).length}]</Text>
                 </Pressable>
             </View>
             {isLoading ?
@@ -328,10 +341,9 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
                     style={styles.list}
                     contentContainerStyle={styles.listScrollContent}
                     renderItem={({ item }) => (
-                        <ListItem item={item} type={'BACKLOG'} />
+                        <ListItem item={item} type={'BACKLOG'} isOpen={item.isMenuOpen} onClick={() => onClick(item.id)} />
                     )}
                 />}
-
         </View>
     );
 }
