@@ -1,8 +1,6 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text } from 'react-native';
-import { FontAwesome5 } from '@expo/vector-icons';
-import SortButtonOptions from '../components/SortButtonOptions';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { View } from '../components/Themed';
 import { RootTabScreenProps } from '../types';
 import { SortProperty } from '../constants/SortProperty';
@@ -17,7 +15,10 @@ import { firestore } from '../firebaseConfig';
 import { HLTBInfo } from '../types/HLTBInfo';
 import { Cache } from '../interfaces/Cache';
 import { MetacriticInfo } from '../types/MetacriticInfo';
-import ListItem from '../components/ListItem';
+import SortButton from '../components/SortButton';
+import { LoadingIndicator } from '../components/LoadingIndicator';
+import { ListItemView } from '../components/ListItemView';
+import { FilterButton } from '../components/FilterButton';
 
 const memoizee = require('memoizee');
 
@@ -27,6 +28,7 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
     const [fullBacklog, setFullBacklog] = useState<Game[]>([]);
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
+    const [refreshing, setRefreshing] = useState(false);
 
     const getGameInformation = async (list: Array<Game>) => {
         const promises = list.map(async (game: Game) => {
@@ -45,20 +47,23 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
     };
 
     const filterCharacters = (title: string): string => {
-        const copyrightSign = String.fromCharCode(169);
-        const registeredSign = String.fromCharCode(174);
-        const trademarkSymbol = String.fromCharCode(8482);
+        const specialCharacters = [
+            String.fromCharCode(169),
+            String.fromCharCode(174),
+            String.fromCharCode(8482),
+            'Remastered',
+            '+ A NEW POWER AWAKENS SET',
+            ': Duke of Switch Edition',
+            'Commander Keen in ',
+            ': Bundle of Terror',
+            ' — Complete Edition',
+            ' - The End of YoRHa Edition'
+        ];
 
-        let filteredTitle = title.split(copyrightSign).join('');
-        filteredTitle = filteredTitle.split(registeredSign).join('');
-        filteredTitle = filteredTitle.split(trademarkSymbol).join('');
-        filteredTitle = filteredTitle.split('Remastered').join('').trim();
-        filteredTitle = filteredTitle.split('+ A NEW POWER AWAKENS SET').join('').trim();
-        filteredTitle = filteredTitle.split(': Duke of Switch Edition').join('').trim();
-        filteredTitle = filteredTitle.split('Commander Keen in ').join('').trim();
-        filteredTitle = filteredTitle.split(': Bundle of Terror').join('').trim();
-        filteredTitle = filteredTitle.split(' — Complete Edition').join('').trim();
-        filteredTitle = filteredTitle.split(' - The End of YoRHa Edition').join('').trim();
+        let filteredTitle = title;
+        specialCharacters.forEach(char => {
+            filteredTitle = filteredTitle.split(char).join('').trim();
+        });
         return filteredTitle;
     };
 
@@ -135,37 +140,28 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         });
     };
 
-    const sortBacklogAlphabetical = (backlog: any) => {
-        return backlog.sort((a: any, b: any) => {
-            return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
-                b.title.toLowerCase().localeCompare(a.title.toLowerCase());
-        });
-    };
+    const getBacklog = async(mounted: boolean) => {
+        try {
+            const backlog = await getBacklogGames(firestore);
+            const sortedBacklog = sortAlphabetical(backlog);
+            const backlogWithAdditionalInformation = await getGameInformation(sortedBacklog);
+
+            if (mounted) {
+                setFullBacklog(backlogWithAdditionalInformation);
+                setBacklogData(getPlaying(backlogWithAdditionalInformation));
+                setIsLoading(false);
+            }
+        } catch (error: any) {
+            if (mounted) {
+                setIsLoading(false);
+            }
+        }
+    }
 
     useEffect(() => {
         let mounted = true;
-
-        async function getBacklog() {
-            try {
-                const backlog = await getBacklogGames(firestore);
-                const sortedBacklog = sortBacklogAlphabetical(backlog);
-                const backlogWithAdditionalInformation = await getGameInformation(sortedBacklog);
-
-                if (mounted) {
-                    setFullBacklog(backlogWithAdditionalInformation);
-                    setBacklogData(getPlaying(backlogWithAdditionalInformation));
-                    setIsLoading(false);
-                }
-
-            } catch (error: any) {
-                if (mounted) {
-                    setIsLoading(false);
-                }
-            }
-        }
-
         if (mounted) {
-            void getBacklog();
+            void getBacklog(mounted);
         }
 
         return function cleanUp() {
@@ -174,116 +170,60 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
     }, []);
 
     useEffect(() => {
-        if (sortBy === SortProperty.ALPHABETICAL) {
-            sortAlphabetical();
-        } else if (sortBy === SortProperty.HLTB) {
-            sortByHLTB();
-        } else if (sortBy === SortProperty.METACRITIC) {
-            sortByMetacritic();
+        const sortFunctions = {
+            [SortProperty.ALPHABETICAL]: sortAlphabetical,
+            [SortProperty.HLTB]: sortByHLTB,
+        };
+
+        const sortFunction = sortFunctions[sortBy];
+        if (sortFunction) {
+            const sortedList = sortFunction(backlogData);
+            setBacklogData(sortedList);
         }
     }, [sortBy, sortAscending]);
 
-    const isAll = () => {
-        setBacklogData(getAll(fullBacklog));
-        resetSort();
-    };
-
-    const isPhysical = () => {
-        setBacklogData(getOnlyPhysical(fullBacklog));
-        resetSort();
-    };
-
-    const isDigital = () => {
-        setBacklogData(getOnlyDigital(fullBacklog));
-        resetSort();
-    };
-
-    const isPlaying = () => {
-        setBacklogData(getPlaying(fullBacklog));
-        resetSort();
-    };
-
-    const isPaused = () => {
-        setBacklogData(getPaused(fullBacklog));
-        resetSort();
-    };
-
-    const getAll = memoizee(() => {
-        return fullBacklog;
-    });
-
-    const getOnlyPhysical = memoizee((items: Game[]) => {
-        return items.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
-    });
-
-    const getOnlyDigital = memoizee((items: Game[]) => {
-        return items.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
-    });
-
-    const getPlaying = memoizee((items: Game[]) => {
-        return items.filter((game: any) => game.completion === Completion.PLAYING);
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        getBacklog(true).then(() => setRefreshing(false));
     }, []);
 
-    const getPaused = memoizee((items: Game[]) => {
-        return items.filter((game: any) => game.completion === Completion.PAUSED);
+    const setFilteredDataAndResetSort = (filterFn: (items: Game[]) => Game[]) => {
+        setBacklogData(filterFn(fullBacklog));
+        resetSort();
+    };
+
+    const isAll = () => setFilteredDataAndResetSort(getAll);
+    const isPhysical = () => setFilteredDataAndResetSort(getOnlyPhysical);
+    const isDigital = () => setFilteredDataAndResetSort(getOnlyDigital);
+    const isPlaying = () => setFilteredDataAndResetSort(getPlaying);
+    const isPaused = () => setFilteredDataAndResetSort(getPaused);
+
+    const getFilteredGames = memoizee((items: Game[], filterFn: (game: Game) => boolean) => {
+        return items.filter(filterFn);
     });
 
-    const toggleSort = () => {
-        if (sortBy === SortProperty.ALPHABETICAL && sortAscending) {
-            setSortBy(SortProperty.ALPHABETICAL);
-            setSortAscending(false);
-        } else if (sortBy === SortProperty.ALPHABETICAL && !sortAscending) {
-            setSortBy(SortProperty.HLTB);
-            setSortAscending(true);
-        } else if (sortBy === SortProperty.HLTB && sortAscending) {
-            setSortBy(SortProperty.HLTB);
-            setSortAscending(false);
-        } else if (sortBy === SortProperty.HLTB && !sortAscending) {
-            setSortBy(SortProperty.METACRITIC);
-            setSortAscending(true);
-        } else if (sortBy === SortProperty.METACRITIC && sortAscending) {
-            setSortBy(SortProperty.METACRITIC);
-            setSortAscending(false);
-        } else if (sortBy === SortProperty.METACRITIC && !sortAscending) {
-            setSortBy(SortProperty.ALPHABETICAL);
-            setSortAscending(true);
-        }
+    const getAll = () => fullBacklog;
+    const getOnlyPhysical = (items: Game[]) => getFilteredGames(items, (game: Game) => game.gameCopy.includes(GameCopy.PHYSICAL));
+    const getOnlyDigital = (items: Game[]) => getFilteredGames(items, (game: Game) => game.gameCopy.includes(GameCopy.DIGITAL));
+    const getPlaying = (items: Game[]) => getFilteredGames(items, (game: Game) => game.completion === Completion.PLAYING);
+    const getPaused = (items: Game[]) => getFilteredGames(items, (game: Game) => game.completion === Completion.PAUSED);
+
+    const sortAlphabetical = (list: any) => {
+        return [...list].sort((a: any, b: any) => (sortAscending ? 1 : -1) * a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
     };
 
-    const sortAlphabetical = () => {
-        const sortedList = [...backlogData].sort((a: any, b: any) => {
-            return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
-                b.title.toLowerCase().localeCompare(a.title.toLowerCase());
-        });
-        setBacklogData(sortedList);
-    };
-
-    const sortByHLTB = () => {
-        const sortedList = [...backlogData].sort((a: any, b: any) => {
-            if (a.hltbInfo && b.hltbInfo) {
-                if (a.hltbInfo.comp_main && b.hltbInfo.comp_main) {
-                    return sortAscending ? a.hltbInfo.comp_main - b.hltbInfo.comp_main :
-                        b.hltbInfo.comp_main - a.hltbInfo.comp_main;
-                }
-                return (a.hltbInfo.comp_main && !b.hltbInfo.comp_main) ? -1 : (!a.hltbInfo.comp_main && b.hltbInfo.comp_main) ? 1 : 0;
+    const sortByHLTB = (list: any) => {
+        return [...list].sort((a: any, b: any) => {
+            const aMain = a.hltbInfo?.comp_main;
+            const bMain = b.hltbInfo?.comp_main;
+            if (aMain && bMain) {
+                return sortAscending ? aMain - bMain : bMain - aMain;
             }
-            return (a.hltbInfo && !b.hltbInfo) ? -1 : (!a.hltbInfo && b.hltbInfo) ? 1 : 0;
-        });
-        setBacklogData(sortedList);
-    };
-
-    const sortByMetacritic = (): void => {
-        const sortedList = [...backlogData].sort((a: any, b: any) => {
-            if (a.metacriticInfo && b.metacriticInfo) {
-                if (a.metacriticInfo.metacriticScore && b.metacriticInfo.metacriticScore) {
-                    return sortAscending ? a.metacriticInfo.metacriticScore - b.metacriticInfo.metacriticScore :
-                        b.metacriticInfo.metacriticScore - a.metacriticInfo.metacriticScore;
-                }
-                return (a.metacriticInfo.metacriticScore && !b.metacriticInfo.metacriticScore) ? -1 : (!a.metacriticInfo.metacriticScore && b.metacritic.metacriticScore) ? 1 : 0;
+            if (aMain || bMain) {
+                return aMain ? -1 : 1;
             }
-            return (a.metacriticInfo && !b.metacriticInfo) ? -1 : (!a.metacriticInfo && b.metacriticInfo) ? 1 : 0;
+            return 0;
         });
-        setBacklogData(sortedList);
     };
 
     const resetSort = () => {
@@ -291,59 +231,32 @@ export default function BacklogScreen({ navigation }: RootTabScreenProps<'Backlo
         setSortBy(SortProperty.ALPHABETICAL);
     };
 
-    const onClick = (clickedItemId: number): void => {
-        const updatedList = backlogData.map((item: Game) => {
+    const ButtonGroup = () => {
+        const buttonData = [
+            { onPress: isAll, text: 'All ', numberOfItems: getAll().length },
+            { onPress: isPhysical, icon: "sd-card", numberOfItems: getOnlyPhysical(fullBacklog).length },
+            { onPress: isDigital, icon: "cloud-download-alt", numberOfItems: getOnlyDigital(fullBacklog).length },
+            { onPress: isPlaying, icon: "gamepad", numberOfItems: getPlaying(fullBacklog).length },
+            { onPress: isPaused, icon: "pause", numberOfItems: getPaused(fullBacklog).length },
+        ];
 
-            if (item.id === clickedItemId) {
-                return { ...item, isMenuOpen: !item.isMenuOpen };
-            } else {
-                return { ...item, isMenuOpen: false };
-            }
-        });
-        setBacklogData(updatedList);
-    }
+        return (
+            <View style={styles.buttonGroup}>
+                {buttonData.map((button, index) => (
+                    <FilterButton key={index} filterFunction={button.onPress} iconName={button.icon} text={button.text} numberOfItems={button.numberOfItems} />
+                ))}
+            </View>
+        );
+    };
 
     return (
         <View style={styles.container}>
-            <View style={styles.buttonGroup}>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, styles.largeButton]} onPress={toggleSort}>
-                    <SortButtonOptions sortBy={sortBy} sortAscending={sortAscending} />
-                </Pressable>
-            </View>
-            <View style={styles.buttonGroup}>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isAll}>
-                    <Text style={styles.buttonText}>All [{getAll(fullBacklog).length}]</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPhysical}>
-                    <FontAwesome5 name="sd-card" size={20} color="red" style={{ paddingRight: 5 }} />
-                    <Text style={styles.buttonText}>[{getOnlyPhysical(fullBacklog).length}]</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isDigital}>
-                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getOnlyDigital(fullBacklog).length}]</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPlaying}>
-                    <FontAwesome5 name="gamepad" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getPlaying(fullBacklog).length}]</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPaused}>
-                    <FontAwesome5 name="pause" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getPaused(fullBacklog).length}]</Text>
-                </Pressable>
-            </View>
-            {isLoading ?
-                <ActivityIndicator style={styles.loadingSpinner} size="large" color="#fff" /> :
-                <FlatList
-                    removeClippedSubviews
-                    data={backlogData}
-                    initialNumToRender={8}
-                    keyExtractor={(item => item.id.toString())}
-                    style={styles.list}
-                    contentContainerStyle={styles.listScrollContent}
-                    renderItem={({ item }) => (
-                        <ListItem item={item} type={'BACKLOG'} isOpen={item.isMenuOpen} onClick={() => onClick(item.id)} />
-                    )}
-                />}
+            <SortButton sortBy={sortBy} sortAscending={sortAscending} setSortBy={setSortBy} setSortAscending={setSortAscending}/>
+            <ButtonGroup/>
+            { isLoading ?
+                <LoadingIndicator /> :
+                <ListItemView listData={backlogData} listType={'BACKLOG'} setListData={setBacklogData} refreshing={refreshing} onRefresh={onRefresh} />
+            }
         </View>
     );
 }
@@ -355,44 +268,8 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
         flex: 1,
     },
-    loadingSpinner: {
-        height: 250,
-    },
-    list: {
-        width: '100%',
-        paddingBottom: 100,
-    },
-    listScrollContent: {
-        display: 'flex',
-        alignItems: 'center',
-    },
     buttonGroup: {
         display: 'flex',
         flexDirection: 'row',
     },
-    button: {
-        display: 'flex',
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        borderWidth: 1,
-        borderStyle: 'solid',
-        borderColor: 'red',
-        marginTop: 8,
-        marginBottom: 4,
-        marginRight: 2,
-        marginLeft: 2,
-        padding: 8,
-        width: 70,
-    },
-    largeButton: {
-        width: 150,
-    },
-    buttonContent: {
-        display: 'flex',
-        flexDirection: 'row'
-    },
-    buttonText: {
-        color: '#ffffff',
-        display: 'flex',
-    }
 });

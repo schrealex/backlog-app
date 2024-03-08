@@ -1,8 +1,7 @@
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text } from 'react-native';
-import { View } from '../components/Themed';
 import * as React from 'react';
-import { useEffect, useState } from 'react';
-import ListItem from '../components/ListItem';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text } from 'react-native';
+import { View } from '../components/Themed';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Firestore } from 'firebase/firestore';
 import { collection, getDocs } from 'firebase/firestore/lite';
@@ -11,19 +10,10 @@ import { SortProperty } from '../constants/SortProperty';
 import { GameCopy } from '../constants/GameCopy';
 import { Completion } from '../constants/Completion';
 import { Game } from '../types/Game';
-
-function ButtonContent({ sortBy, sortAscending }: any) {
-    return (
-        <View style={styles.buttonContent}>
-            {sortBy === SortProperty.ALPHABETICAL && sortAscending ?
-                <FontAwesome5 name="sort-alpha-down" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            {sortBy === SortProperty.ALPHABETICAL && !sortAscending ?
-                <FontAwesome5 name="sort-alpha-down-alt" size={20} color="red" style={{ paddingRight: 5 }} /> : null}
-            <Text
-                style={styles.buttonText}>{sortBy === SortProperty.ALPHABETICAL ? 'Sort Alphabetical' : ''}</Text>
-        </View>
-    );
-}
+import SortButton from '../components/SortButton';
+import { LoadingIndicator } from '../components/LoadingIndicator';
+import { FilterButton } from '../components/FilterButton';
+import { ListItemView } from '../components/ListItemView';
 
 export default function FullListScreen() {
     const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +21,7 @@ export default function FullListScreen() {
     const [fullListData, setFullListData]: Array<any> = useState([]);
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
+    const [refreshing, setRefreshing] = useState(false);
 
     const getAllTheGames = async (fs: Firestore) => {
         const fullGamesList = collection(fs, 'full-games-list');
@@ -42,36 +33,28 @@ export default function FullListScreen() {
         });
     };
 
-    const sortGamesAlphabetical = (games: any) => {
-        return games.sort((a: any, b: any) => {
-            return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
-                b.title.toLowerCase().localeCompare(a.title.toLowerCase());
-        });
-    };
+    const getFullListOfGames = async (mounted: boolean) => {
+        try {
+            const allTheGames = await getAllTheGames(firestore);
+            const sortedGamesList = sortAlphabetical(allTheGames);
+
+            if (mounted) {
+                setFullList(sortedGamesList);
+                setFullListData(sortedGamesList);
+                setIsLoading(false);
+            }
+
+        } catch (error: any) {
+            if (mounted) {
+                setIsLoading(false);
+            }
+        }
+    }
 
     useEffect(() => {
         let mounted = true;
-
-        async function getFullListOfGames() {
-            try {
-                const allTheGames = await getAllTheGames(firestore);
-                const sortedGamesList = sortGamesAlphabetical(allTheGames);
-
-                if (mounted) {
-                    setFullList(sortedGamesList);
-                    setFullListData(sortedGamesList);
-                    setIsLoading(false);
-                }
-
-            } catch (error: any) {
-                if (mounted) {
-                    setIsLoading(false);
-                }
-            }
-        }
-
         if (mounted) {
-            void getFullListOfGames();
+            void getFullListOfGames(mounted);
         }
 
         return function cleanUp() {
@@ -79,142 +62,66 @@ export default function FullListScreen() {
         };
     }, []);
 
-    const isAll = () => {
-        setFullListData(getAll());
-    };
-
-    const isPhysical = () => {
-        setFullListData(getOnlyPhysical());
-    };
-
-    const isDigital = () => {
-        setFullListData(getOnlyDigital());
-    };
-
-    const isBoth = () => {
-        setFullListData(getBoth());
-    };
-
-    const isDropped = () => {
-        setFullListData(getDropped());
-    };
-
-    const isBeaten = () => {
-        setFullListData(getBeaten());
-    };
-
-    const isCompleted = () => {
-        setFullListData(getCompleted());
-    };
-
-    const getAll = () => {
-        return fullList;
-    };
-
-    const getOnlyPhysical = () => {
-        return fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
-    };
-
-    const getOnlyDigital = () => {
-        return fullList.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
-    };
-
-    const getBoth = () => {
-        return fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL) && game.gameCopy.includes(GameCopy.DIGITAL));
-    };
-
-    const getDropped = () => {
-        return fullList.filter((game: any) => game.completion === Completion.DROPPED);
-    };
-
-    const getBeaten = () => {
-        return fullList.filter((game: any) => game.completion === Completion.BEATEN);
-    };
-
-    const getCompleted = () => {
-        return fullList.filter((game: any) => game.completion === Completion.COMPLETED);
-    };
-
-    const toggleSort = () => {
-        if (sortBy === SortProperty.ALPHABETICAL && sortAscending) {
-            setSortBy(SortProperty.ALPHABETICAL);
-            setSortAscending(false);
-            sortAlphabetical();
-        } else if (sortBy === SortProperty.ALPHABETICAL && !sortAscending) {
-            setSortBy(SortProperty.ALPHABETICAL);
-            setSortAscending(true);
-            sortAlphabetical();
-        }
-    };
-
-    const sortAlphabetical = () => {
-
-        const sortedList = [...fullListData].sort((a: any, b: any) => {
-            return sortAscending ? b.title.toLowerCase().localeCompare(a.title.toLowerCase()) :
-                a.title.toLowerCase().localeCompare(b.title.toLowerCase());
-        });
+    useEffect(() => {
+        const sortedList = sortAlphabetical(fullListData);
         setFullListData(sortedList);
+    }, [sortBy, sortAscending]);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        getFullListOfGames(true).then(() => setRefreshing(false));
+    }, []);
+
+    const sortAlphabetical = (list: any) => {
+        return list.sort((a: any, b: any) => (sortAscending ? 1 : -1) * a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
     };
 
-    const onClick = (clickedItemId: number): void => {
-        const updatedList = fullList.map((item: Game) => {
+    const setFullListDataWithFilter = (filterFn: () => Game[]) => {
+        setFullListData(filterFn());
+    };
 
-            if (item.id === clickedItemId) {
-                return { ...item, isMenuOpen: !item.isMenuOpen };
-            } else {
-                return { ...item, isMenuOpen: false };
-            }
-        });
-        setFullListData(updatedList);
-    }
+    const isAll = () => setFullListDataWithFilter(getAll);
+    const isPhysical = () => setFullListDataWithFilter(getOnlyPhysical);
+    const isDigital = () => setFullListDataWithFilter(getOnlyDigital);
+    const isBoth = () => setFullListDataWithFilter(getBoth);
+    const isDropped = () => setFullListDataWithFilter(getDropped);
+    const isBeaten = () => setFullListDataWithFilter(getBeaten);
+    const isCompleted = () => setFullListDataWithFilter(getCompleted);
+
+    const getFilteredGames = (filterFn: (game: Game) => boolean) => {
+        return fullList.filter(filterFn);
+    };
+
+    const getAll = () => fullList;
+    const getOnlyPhysical = () => getFilteredGames(game => game.gameCopy.includes(GameCopy.PHYSICAL));
+    const getOnlyDigital = () => getFilteredGames(game => game.gameCopy.includes(GameCopy.DIGITAL));
+    const getBoth = () => getFilteredGames(game => game.gameCopy.includes(GameCopy.PHYSICAL) && game.gameCopy.includes(GameCopy.DIGITAL));
+    const getDropped = () => getFilteredGames(game => game.completion === Completion.DROPPED);
+    const getBeaten = () => getFilteredGames(game => game.completion === Completion.BEATEN);
+    const getCompleted = () => getFilteredGames(game => game.completion === Completion.COMPLETED);
 
     return (
         <View style={styles.container}>
+            <SortButton sortBy={SortProperty.ALPHABETICAL} sortAscending={sortAscending} setSortBy={setSortBy} setSortAscending={setSortAscending} />
             <View style={styles.buttonGroup}>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, styles.largeButton]} onPress={toggleSort}>
-                    <ButtonContent sortBy={sortBy} sortAscending={sortAscending} />
-                </Pressable>
-            </View>
-            <View style={styles.buttonGroup}>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isAll}>
-                    <Text style={styles.buttonText}>All [{getAll().length}]</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPhysical}>
-                    <FontAwesome5 name="sd-card" size={20} color="red" style={{ paddingRight: 5 }} />
-                    <Text style={styles.buttonText}>[{getOnlyPhysical().length}]</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isDigital}>
-                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getOnlyDigital().length}]</Text>
-                </Pressable>
+                <FilterButton filterFunction={isAll} text={'All '} numberOfItems={getAll().length} />
+                <FilterButton filterFunction={isPhysical} iconName="sd-card" numberOfItems={getOnlyPhysical().length} />
+                <FilterButton filterFunction={isDigital} iconName="cloud-download-alt" numberOfItems={getOnlyDigital().length} />
                 <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isBoth}>
-                    <FontAwesome5 name="sd-card" size={20} color="red" style={{ paddingRight: 5 }} /><FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getBoth().length}]</Text>
+                    <FontAwesome5 name="sd-card" size={20} color="red" style={{ paddingRight: 5 }} />
+                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} />
+                    <Text style={styles.buttonText}>[{getBoth().length}]</Text>
                 </Pressable>
             </View>
             <View style={styles.buttonGroup}>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isDropped}>
-                    <FontAwesome5 name="times" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getDropped().length}]</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isBeaten}>
-                    <FontAwesome5 name="fist-raised" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getBeaten().length}]</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isCompleted}>
-                    <FontAwesome5 name="trophy" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getCompleted().length}]</Text>
-                </Pressable>
+                <FilterButton filterFunction={isDropped} iconName="times" numberOfItems={getDropped().length} />
+                <FilterButton filterFunction={isBeaten} iconName="fist-raised" numberOfItems={getBeaten().length} />
+                <FilterButton filterFunction={isCompleted} iconName="trophy" numberOfItems={getCompleted().length} />
             </View>
-            {isLoading ?
-                <ActivityIndicator style={styles.loadingSpinner} size="large" color="#fff" /> :
-                <FlatList
-                    data={fullListData}
-                    keyExtractor={(item => item.id.toString())}
-                    renderItem={({ item }) => (
-                        <ListItem item={item} type={'FULL_LIST'} isOpen={item.isMenuOpen} onClick={() => onClick(item.id)} />
-                    )}
-                />}
+            { isLoading ?
+                <LoadingIndicator /> :
+                <ListItemView listData={fullListData} listType={'FULL_LIST'} setListData={setFullListData} refreshing={refreshing} onRefresh={onRefresh} />
+            }
         </View>
     );
 }
@@ -225,21 +132,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-start',
         flex: 1,
-    },
-    loadingSpinner: {
-        height: 250,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-    },
-    item: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 10,
-        fontSize: 16,
-        width: 'min-content',
     },
     buttonGroup: {
         display: 'flex',
@@ -257,14 +149,6 @@ const styles = StyleSheet.create({
         marginRight: 2,
         marginLeft: 2,
         padding: 8,
-        width: 75,
-    },
-    largeButton: {
-        width: 150,
-    },
-    buttonContent: {
-        display: 'flex',
-        flexDirection: 'row'
     },
     buttonText: {
         color: '#ffffff',
