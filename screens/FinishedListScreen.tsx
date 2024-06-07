@@ -1,7 +1,7 @@
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text } from 'react-native';
 import { View } from '../components/Themed';
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import ListItem from '../components/ListItem';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Firestore } from 'firebase/firestore';
@@ -31,6 +31,7 @@ export default function FinishedListScreen() {
     const [fullListData, setFullListData]: Array<any> = useState([]);
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
+    const [refreshing, setRefreshing] = useState(false);
 
     const getAllTheGames = async (fs: Firestore) => {
         const fullGamesList = collection(fs, 'full-games-list');
@@ -50,29 +51,28 @@ export default function FinishedListScreen() {
         });
     };
 
-    useEffect(() => {
-        let mounted = true;
+    async function getFullListOfGames(mounted: boolean) {
+        try {
+            const allTheGames = await getAllTheGames(firestore);
+            const sortedGamesList = sortGamesAlphabetical(allTheGames);
 
-        async function getFullListOfGames() {
-            try {
-                const allTheGames = await getAllTheGames(firestore);
-                const sortedGamesList = sortGamesAlphabetical(allTheGames);
+            if (mounted) {
+                setFullList(sortedGamesList);
+                setFullListData(sortedGamesList);
+                setIsLoading(false);
+            }
 
-                if (mounted) {
-                    setFullList(sortedGamesList);
-                    setFullListData(sortedGamesList);
-                    setIsLoading(false);
-                }
-
-            } catch (error: any) {
-                if (mounted) {
-                    setIsLoading(false);
-                }
+        } catch (error: any) {
+            if (mounted) {
+                setIsLoading(false);
             }
         }
+    }
 
+    useEffect(() => {
+        let mounted = true;
         if (mounted) {
-            void getFullListOfGames();
+            void getFullListOfGames(mounted);
         }
 
         return function cleanUp() {
@@ -161,6 +161,11 @@ export default function FinishedListScreen() {
         setFullListData(updatedList);
     }
 
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        getFullListOfGames(true).then(() => setRefreshing(false));
+    }, []);
+
     return (
         <View style={styles.container}>
             <View style={styles.buttonGroup}>
@@ -200,6 +205,9 @@ export default function FinishedListScreen() {
                 <FlatList
                     data={fullListData}
                     keyExtractor={(item => item.id.toString())}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh}/>
+                    }
                     renderItem={({ item }) => (
                         <ListItem item={item} type={'FULL_LIST'} isOpen={item.isMenuOpen} onClick={() => onClick(item.id)}  />
                     )}

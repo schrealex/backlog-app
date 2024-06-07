@@ -17,7 +17,7 @@ const linking: LinkingOptions<RootStackParamList> = {
                 screens: {
                     Backlog: {
                         screens: {
-                            BacklogScreen: 'Backlog',
+                            BaseBacklogScreen: 'Backlog',
                         },
                     },
                     Finished: {
@@ -32,7 +32,7 @@ const linking: LinkingOptions<RootStackParamList> = {
                     },
                     RetroBacklog: {
                         screens: {
-                            RetroBacklogScreen: 'Retro backlog',
+                            BaseBacklogScreen: 'Retro backlog',
                         },
                     },
                     RandomSuggestion: {

@@ -84,6 +84,7 @@ export default function FullListScreen() {
     const isPhysical = () => setFullListDataWithFilter(getOnlyPhysical);
     const isDigital = () => setFullListDataWithFilter(getOnlyDigital);
     const isBoth = () => setFullListDataWithFilter(getBoth);
+    const isContinuous = () => setFullListDataWithFilter(getContinuous);
     const isDropped = () => setFullListDataWithFilter(getDropped);
     const isBeaten = () => setFullListDataWithFilter(getBeaten);
     const isCompleted = () => setFullListDataWithFilter(getCompleted);
@@ -96,6 +97,7 @@ export default function FullListScreen() {
     const getOnlyPhysical = () => getFilteredGames(game => game.gameCopy.includes(GameCopy.PHYSICAL));
     const getOnlyDigital = () => getFilteredGames(game => game.gameCopy.includes(GameCopy.DIGITAL));
     const getBoth = () => getFilteredGames(game => game.gameCopy.includes(GameCopy.PHYSICAL) && game.gameCopy.includes(GameCopy.DIGITAL));
+    const getContinuous = () => getFilteredGames(game => game.completion === Completion.CONTINUOUS);
     const getDropped = () => getFilteredGames(game => game.completion === Completion.DROPPED);
     const getBeaten = () => getFilteredGames(game => game.completion === Completion.BEATEN);
     const getCompleted = () => getFilteredGames(game => game.completion === Completion.COMPLETED);
@@ -114,6 +116,7 @@ export default function FullListScreen() {
                 </Pressable>
             </View>
             <View style={styles.buttonGroup}>
+                <FilterButton filterFunction={isContinuous} iconName="recycle" numberOfItems={getContinuous().length} />
                 <FilterButton filterFunction={isDropped} iconName="times" numberOfItems={getDropped().length} />
                 <FilterButton filterFunction={isBeaten} iconName="fist-raised" numberOfItems={getBeaten().length} />
                 <FilterButton filterFunction={isCompleted} iconName="trophy" numberOfItems={getCompleted().length} />

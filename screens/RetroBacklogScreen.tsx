@@ -9,19 +9,14 @@ import { Firestore } from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
 
 import { SortProperty } from '../constants/SortProperty';
-import { GameCopy } from '../constants/GameCopy';
-import { Completion } from '../constants/Completion';
 import { Game } from '../types/Game';
-import { HLTBInfo } from '../types/HLTBInfo';
-import { Cache } from '../interfaces/Cache';
-import SortButton from '../components/SortButton';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ListItemView } from '../components/ListItemView';
-import { FilterButton } from '../components/FilterButton';
+import { getHLTBInformation } from '../services/InformationService';
+import ButtonGroup from '../components/ButtonGroup';
+import SortButton from '../components/SortButton';
 
-const memoizee = require('memoizee');
-
-export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'RetroBacklog'>) {
+export default function RetroBacklogScreen({}: RootTabScreenProps<'RetroBacklog'>) {
     const [isLoading, setIsLoading] = useState(true);
     const [backlogData, setBacklogData] = useState<Game[]>([]);
     const [fullBacklog, setFullBacklog] = useState<Game[]>([]);
@@ -30,7 +25,7 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
     const [refreshing, setRefreshing] = useState(false);
 
     const getRetroBacklogGames = async (fs: Firestore) => {
-        const fullGamesList = collection(fs, 'retro-backlog');
+        const fullGamesList  = collection(fs, 'retro-backlog');
         const fullGamesListSnapshot = await getDocs(fullGamesList);
         return fullGamesListSnapshot.docs.map(doc => {
             const documentId = doc.id;
@@ -38,58 +33,6 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
             return { ...data, documentId };
         });
     };
-
-    const filterCharacters = (title: string): string => {
-        const specialCharacters = [
-            String.fromCharCode(169), // copyrightSign
-            String.fromCharCode(174), // registeredSign
-            String.fromCharCode(8482), // trademarkSymbol
-            'Remastered',
-            '+ A NEW POWER AWAKENS SET',
-            ': Duke of Switch Edition',
-            'Commander Keen in ',
-            ': Bundle of Terror',
-            ' — Complete Edition',
-            ' - The End of YoRHa Edition'
-        ];
-
-        let filteredTitle = title;
-        specialCharacters.forEach(char => {
-            filteredTitle = filteredTitle.split(char).join('').trim();
-        });
-        return filteredTitle;
-    };
-
-    const getHLTBInformation = async (title: string): Promise<HLTBInfo | undefined> => {
-        if (getHLTBInformation.cache[title]) {
-            return getHLTBInformation.cache[title];
-        }
-
-        const filteredTitle = filterCharacters(title);
-
-        const gameInformationURL = `https://game-information.vercel.app/how-long-to-beat?title=${filteredTitle}`;
-        const gameInformation = await fetch(gameInformationURL);
-
-        if (!gameInformation) {
-            console.error('HLTB information fetch failed');
-            setIsLoading(false);
-        }
-        if (gameInformation.status === 403) {
-            console.error('HLTB information rate limit');
-            setIsLoading(false);
-        }
-        if (!gameInformation.ok) {
-            console.error('HLTB information request failed');
-            setIsLoading(false);
-        }
-        const response = await gameInformation.json();
-        const result = (response.data as HLTBInfo[]).find((item: HLTBInfo) => (item.game_name === filteredTitle || item.game_alias === filteredTitle));
-
-        getHLTBInformation.cache[filteredTitle] = result;
-        return result;
-    };
-
-    getHLTBInformation.cache = {} as Cache;
 
     const getRetroBacklog = async(mounted: boolean) => {
         try {
@@ -141,27 +84,6 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
         getRetroBacklog(true).then(() => setRefreshing(false));
     }, []);
 
-    const setFilteredDataAndResetSort = (filterFunction: (items: Game[]) => Game[]) => {
-        setBacklogData(filterFunction(fullBacklog));
-        resetSort();
-    };
-
-    const isAll = () => setFilteredDataAndResetSort(getAll);
-    const isPhysical = () => setFilteredDataAndResetSort(getOnlyPhysical);
-    const isDigital = () => setFilteredDataAndResetSort(getOnlyDigital);
-    const isPlaying = () => setFilteredDataAndResetSort(getPlaying);
-    const isPaused = () => setFilteredDataAndResetSort(getPaused);
-
-    const getFilteredGames = memoizee((items: Game[], filterFn: (game: Game) => boolean) => {
-        return items.filter(filterFn);
-    });
-
-    const getAll = () => fullBacklog;
-    const getOnlyPhysical = (items: Game[]) => getFilteredGames(items, (game: Game) => game.gameCopy.includes(GameCopy.PHYSICAL));
-    const getOnlyDigital = (items: Game[]) => getFilteredGames(items, (game: Game) => game.gameCopy.includes(GameCopy.DIGITAL));
-    const getPlaying = (items: Game[]) => getFilteredGames(items, (game: Game) => game.completion === Completion.PLAYING);
-    const getPaused = (items: Game[]) => getFilteredGames(items, (game: Game) => game.completion === Completion.PAUSED);
-
     const sortAlphabetical = (list: any) => {
         return [...list].sort((a: any, b: any) => (sortAscending ? 1 : -1) * a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
     };
@@ -180,33 +102,10 @@ export default function RetroBacklogScreen({ navigation }: RootTabScreenProps<'R
         });
     };
 
-    const resetSort = () => {
-        setSortAscending(true);
-        setSortBy(SortProperty.ALPHABETICAL);
-    };
-
-    const ButtonGroup = () => {
-        const buttonData = [
-            { onPress: isAll, text: 'All ', numberOfItems: getAll().length },
-            { onPress: isPhysical, icon: "sd-card", numberOfItems: getOnlyPhysical(fullBacklog).length },
-            { onPress: isDigital, icon: "cloud-download-alt", numberOfItems: getOnlyDigital(fullBacklog).length },
-            { onPress: isPlaying, icon: "gamepad", numberOfItems: getPlaying(fullBacklog).length },
-            { onPress: isPaused, icon: "pause", numberOfItems: getPaused(fullBacklog).length },
-        ];
-
-        return (
-            <View style={styles.buttonGroup}>
-                {buttonData.map((button, index) => (
-                    <FilterButton key={index} filterFunction={button.onPress} iconName={button.icon} text={button.text} numberOfItems={button.numberOfItems} />
-                ))}
-            </View>
-        );
-    };
-
     return (
         <View style={styles.container}>
             <SortButton sortBy={sortBy} sortAscending={sortAscending} setSortBy={setSortBy} setSortAscending={setSortAscending}/>
-            <ButtonGroup/>
+            <ButtonGroup items={fullBacklog} setBacklogData={setBacklogData} setSortAscending={setSortAscending} setSortBy={setSortBy}  />
             { isLoading ?
                 <LoadingIndicator /> :
                 <ListItemView listData={backlogData} listType={'RETRO_BACKLOG'} setListData={setBacklogData} refreshing={refreshing} onRefresh={onRefresh} />

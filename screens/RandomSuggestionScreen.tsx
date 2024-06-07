@@ -47,7 +47,6 @@ export default function RandomSuggestionScreen() {
     getRandomBacklogSuggestion.cache = {} as Cache;
 
     const onClick = (item: Game): void => {
-        console.log({ item });
         const randomItemWithMenu = { ...item, isMenuOpen: !item.isMenuOpen };
         setRandomSuggestion(randomItemWithMenu);
     }

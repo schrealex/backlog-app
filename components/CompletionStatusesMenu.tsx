@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0)',
     },
     completionStatusesMenuTitle: {
-        fontSize: 18,
+        fontSize: 15,
         fontWeight: 'bold',
         padding: 6,
         borderBottomWidth: 2,

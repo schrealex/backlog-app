@@ -3,24 +3,22 @@
  * https://reactnavigation.org/docs/getting-started
  *
  */
-import { FontAwesome, FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome5 } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as React from 'react';
-import { ColorSchemeName, Pressable } from 'react-native';
+import { ColorSchemeName } from 'react-native';
 
 import Colors from '../constants/Colors';
-import useColorScheme from '../hooks/useColorScheme';
 import ModalScreen from '../screens/ModalScreen';
 import NotFoundScreen from '../screens/NotFoundScreen';
-import BacklogScreen from '../screens/BacklogScreen';
 import FullListScreen from '../screens/FullListScreen';
-import { RootStackParamList, RootTabParamList, RootTabScreenProps } from '../types';
+import { RootStackParamList, RootTabParamList } from '../types';
 import LinkingConfiguration from './LinkingConfiguration';
-import RetroBacklogScreen from '../screens/RetroBacklogScreen';
 import FinishedListScreen from "../screens/FinishedListScreen";
 import RandomSuggestionScreen from '../screens/RandomSuggestionScreen';
+import BaseBacklogScreen from '../screens/BaseBacklogScreen';
 
 export default function Navigation({ colorScheme }: { colorScheme: ColorSchemeName }) {
     return (
@@ -55,10 +53,10 @@ function RootNavigator() {
  * https://reactnavigation.org/docs/bottom-tab-navigator
  */
 const BottomTab = createBottomTabNavigator<RootTabParamList>();
+const BacklogScreen = (props: any) => <BaseBacklogScreen {...props} screenType="Backlog" />;
+const RetroBacklogScreen = (props: any) => <BaseBacklogScreen {...props} screenType="RetroBacklog" />;
 
 function BottomTabNavigator() {
-    const colorScheme = useColorScheme();
-
     return (
         <BottomTab.Navigator
             initialRouteName="Backlog"
@@ -69,24 +67,10 @@ function BottomTabNavigator() {
             <BottomTab.Screen
                 name="Backlog"
                 component={BacklogScreen}
-                options={({ navigation }: RootTabScreenProps<'Backlog'>) => ({
+                options={{
                     title: 'Backlog',
                     tabBarIcon: ({ color }) => <FontAwesome5 name="clipboard-check" color={color} size={25} />,
-                    headerRight: () => (
-                        <Pressable
-                            onPress={() => navigation.navigate('Modal')}
-                            style={({ pressed }) => ({
-                                opacity: pressed ? 0.5 : 1,
-                            })}>
-                            <FontAwesome
-                                name="info-circle"
-                                size={25}
-                                color={Colors[colorScheme].text}
-                                style={{ marginRight: 15 }}
-                            />
-                        </Pressable>
-                    ),
-                })}
+                }}
             />
             <BottomTab.Screen
                 name="FullList"
