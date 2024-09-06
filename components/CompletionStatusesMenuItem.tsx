@@ -25,7 +25,7 @@ export function CompletionStatusesMenuItem({ type, item, completionStatus, onCli
         })
         .then()
         .catch(error => {
-            console.log(error);
+            console.error({ call: 'updateFirebaseDocumentWithStatus', error, timestamp: new Date().toISOString() });
         });
     };
 

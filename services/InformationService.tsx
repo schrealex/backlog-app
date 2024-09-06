@@ -2,13 +2,11 @@ import { Cache } from '../interfaces/Cache';
 import { filterCharacters } from '../utilities/Utilities';
 import { HLTBInfo } from '../types/HLTBInfo';
 import { MetacriticInfo } from '../types/MetacriticInfo';
-
-const GAME_INFORMATION_BASE_URL = 'https://game-information.vercel.app/';
-const LOCAL_INFORMATION_BASE_URL = 'http://192.168.2.11:3000/';
+import { GAME_INFORMATION_BASE_URL } from '../constants/Constants';
 
 const fetchInformation = async (title: string, endpoint: string) => {
     const filteredTitle = filterCharacters(title);
-    const url = `${LOCAL_INFORMATION_BASE_URL}${endpoint}?title=${encodeURIComponent(filteredTitle)}`;
+    const url = `${GAME_INFORMATION_BASE_URL}${endpoint}?title=${encodeURIComponent(filteredTitle)}`;
     try {
         const response = await fetch(url);
         if (!response.ok) {
@@ -23,7 +21,6 @@ const fetchInformation = async (title: string, endpoint: string) => {
 };
 
 const getHLTBInformation = async (title: string): Promise<HLTBInfo | undefined> => {
-
     if (getHLTBInformation.cache[title]) {
         return getHLTBInformation.cache[title];
     }

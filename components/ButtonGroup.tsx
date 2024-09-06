@@ -38,11 +38,11 @@ const ButtonGroup = ({ items, setBacklogData, setSortAscending, setSortBy } : { 
     };
 
     const buttonData = [
-        { onPress: isAll, text: 'All ', numberOfItems: getAll().length },
-        { onPress: isPhysical, icon: "sd-card", numberOfItems: getOnlyPhysical(items).length },
-        { onPress: isDigital, icon: "cloud-download-alt", numberOfItems: getOnlyDigital(items).length },
-        { onPress: isPlaying, icon: "gamepad", numberOfItems: getPlaying(items).length },
-        { onPress: isPaused, icon: "pause", numberOfItems: getPaused(items).length },
+        { onPress: isAll, text: 'All ', numberOfItems: getAll()?.length },
+        { onPress: isPhysical, icon: "sd-card", numberOfItems: getOnlyPhysical(items)?.length },
+        { onPress: isDigital, icon: "cloud-download-alt", numberOfItems: getOnlyDigital(items)?.length },
+        { onPress: isPlaying, icon: "gamepad", numberOfItems: getPlaying(items)?.length },
+        { onPress: isPaused, icon: "pause", numberOfItems: getPaused(items)?.length },
     ];
 
     return (

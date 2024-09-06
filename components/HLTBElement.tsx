@@ -8,16 +8,24 @@ import { Game } from '../types/Game';
 export function HLTBElement({ item }: { item: Game }) {
     return (
         <View style={styles.timeToBeatContainer}>
-            { item.hltbInfo && (item.hltbInfo.comp_main > 0 || item.hltbInfo.comp_plus > 0) ?
+            { item.hltbInfo && (item.hltbInfo.comp_main > 0 || item.hltbInfo.comp_plus > 0 || item.hltbInfo.comp_100 > 0)  &&
                 <View style={styles.timeToBeatElement}>
                     <FontAwesome5 name="clock" size={20} color="gold" style={{ backgroundColor: 'rgba(243,197,0,0.34)', borderRadius: 50, padding: 8 }}/>
                     <View style={styles.timeToBeatWrapper}>
-                        <HLTBIconAndTextElement time={item.hltbInfo.comp_main > 0 ? item.hltbInfo.comp_main : item.hltbInfo.comp_plus} icon={"flag-checkered"}></HLTBIconAndTextElement>
-                        { item.hltbInfo.comp_100 > 0 ? <HLTBIconAndTextElement time={item.hltbInfo.comp_100} icon={"trophy"}></HLTBIconAndTextElement> : null }
+                        { (item.hltbInfo.comp_main || item.hltbInfo.comp_plus) && (
+                            <HLTBIconAndTextElement
+                                time={item.hltbInfo.comp_main > 0 ? item.hltbInfo.comp_main : item.hltbInfo.comp_plus}
+                                icon="flag-checkered"
+                            />
+                        )}
+                        { item.hltbInfo.comp_100 > 0 && (
+                            <HLTBIconAndTextElement
+                                time={item.hltbInfo.comp_100}
+                                icon="trophy"
+                            />
+                        )}
                     </View>
                 </View>
-                :
-                null
             }
         </View>
     );

@@ -15,6 +15,7 @@ import { ListItemView } from '../components/ListItemView';
 import { getHLTBInformation } from '../services/InformationService';
 import ButtonGroup from '../components/ButtonGroup';
 import SortButton from '../components/SortButton';
+import { sortAlphabetical, sortByHLTB } from '../utilities/Utilities';
 
 export default function RetroBacklogScreen({}: RootTabScreenProps<'RetroBacklog'>) {
     const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +38,7 @@ export default function RetroBacklogScreen({}: RootTabScreenProps<'RetroBacklog'
     const getRetroBacklog = async(mounted: boolean) => {
         try {
             const retroBacklog = await getRetroBacklogGames(firestore);
-            const sortedRetroBacklog = sortAlphabetical(retroBacklog);
+            const sortedRetroBacklog = sortAlphabetical(retroBacklog, true);
 
             await Promise.all(sortedRetroBacklog.map(async (game: Game) => {
                 game.hltbInfo = await getHLTBInformation(game.title);
@@ -57,11 +58,9 @@ export default function RetroBacklogScreen({}: RootTabScreenProps<'RetroBacklog'
 
     useEffect(() => {
         let mounted = true;
-        if (mounted) {
-            void getRetroBacklog(mounted);
-        }
+        void getRetroBacklog(mounted);
 
-        return function cleanUp() {
+        return () => {
             mounted = false;
         };
     }, []);
@@ -74,7 +73,7 @@ export default function RetroBacklogScreen({}: RootTabScreenProps<'RetroBacklog'
 
         const sortFunction = sortFunctions[sortBy];
         if (sortFunction) {
-            const sortedList: any[] = sortFunction(backlogData);
+            const sortedList: any[] = sortFunction(backlogData, sortAscending);
             setBacklogData(sortedList);
         }
     }, [sortBy, sortAscending]);
@@ -84,23 +83,7 @@ export default function RetroBacklogScreen({}: RootTabScreenProps<'RetroBacklog'
         getRetroBacklog(true).then(() => setRefreshing(false));
     }, []);
 
-    const sortAlphabetical = (list: any) => {
-        return [...list].sort((a: any, b: any) => (sortAscending ? 1 : -1) * a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
-    };
 
-    const sortByHLTB = (list: any) => {
-        return [...list].sort((a: any, b: any) => {
-            const aMain = a.hltbInfo?.comp_main;
-            const bMain = b.hltbInfo?.comp_main;
-            if (aMain && bMain) {
-                return sortAscending ? aMain - bMain : bMain - aMain;
-            }
-            if (aMain || bMain) {
-                return aMain ? -1 : 1;
-            }
-            return 0;
-        });
-    };
 
     return (
         <View style={styles.container}>

@@ -9,6 +9,8 @@ import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ListItemView } from '../components/ListItemView';
 import ButtonGroup from '../components/ButtonGroup';
 import SortButton from '../components/SortButton';
+import { GAME_INFORMATION_BASE_URL } from '../constants/Constants';
+import { sortAlphabetical, sortByHLTB } from '../utilities/Utilities';
 
 export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Backlog' | 'RetroBacklog'> & { screenType: 'Backlog' | 'RetroBacklog' }) {
 
@@ -19,74 +21,42 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
     const [refreshing, setRefreshing] = useState(false);
 
-    const LOCAL_INFORMATION_BASE_URL = 'http://192.168.2.11:3000/';
-
-    const getBacklog = async(mounted: boolean) => {
+    const getBacklog = async() => {
         try {
-            const backlogWithAdditionalInformation = await getFulLBackLogWithInformation();
-            if (mounted) {
-                setFullBacklog(backlogWithAdditionalInformation);
+            const backlogWithAdditionalInformation = await getFullBacklogWithInformation();
+            setFullBacklog(backlogWithAdditionalInformation);
 
+            const playingGames = backlogWithAdditionalInformation.filter((game: any) => game.completion === 'Playing');
 
-                const playingGames = backlogWithAdditionalInformation.filter((game: any) => game.completion === 'Playing');
-
-                setBacklogData(screenType === 'Backlog' ? playingGames : backlogWithAdditionalInformation);
-                setIsLoading(false);
-            }
+            setBacklogData(screenType === 'Backlog' ? playingGames : backlogWithAdditionalInformation);
+            setIsLoading(false);
         } catch (error: any) {
-            if (mounted) {
-                setIsLoading(false);
-            }
+            setIsLoading(false);
         }
     }
 
-    const getFulLBackLogWithInformation = async () => {
+    const getFullBacklogWithInformation = async () => {
+        const url = `${GAME_INFORMATION_BASE_URL}game-information?type=${screenType}`;
         try {
-            const url = `${LOCAL_INFORMATION_BASE_URL}game-information`;
             const response = await fetch(url);
             if (!response.ok) {
-                console.error(`game-information request failed`);
-                return;
+                console.error(`Full backlog with information fetch failed`);
+                return [];
             }
             return await response.json();
         } catch (error) {
-            console.log({ error });
+            console.error({ call: 'getFullBacklogWithInformation', error, url, timestamp: new Date().toISOString() });
             return [];
         }
     };
 
-    const sortAlphabetical = (list: any) => {
-        return [...list].sort((a: any, b: any) => (sortAscending ? 1 : -1) * a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
-    };
-
-    const sortByHLTB = (list: any) => {
-        return [...list].sort((a: any, b: any) => {
-            const aMain = a.hltbInfo?.comp_main;
-            const bMain = b.hltbInfo?.comp_main;
-            if (aMain && bMain) {
-                return sortAscending ? aMain - bMain : bMain - aMain;
-            }
-            if (aMain || bMain) {
-                return aMain ? -1 : 1;
-            }
-            return 0;
-        });
-    };
-
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        getBacklog(true).then(() => setRefreshing(false));
+        getBacklog().then(() => setRefreshing(false));
     }, []);
 
     useEffect(() => {
-        let mounted = true;
-        if (mounted) {
-            void getBacklog(mounted);
-        }
-
-        return function cleanUp() {
-            mounted = false;
-        };
+        void getBacklog();
     }, []);
 
     useEffect(() => {
@@ -97,7 +67,7 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
 
         const sortFunction = sortFunctions[sortBy];
         if (sortFunction) {
-            const sortedList: any[] = sortFunction(backlogData);
+            const sortedList: any[] = sortFunction(backlogData, sortAscending);
             setBacklogData(sortedList);
         }
     }, [sortBy, sortAscending]);

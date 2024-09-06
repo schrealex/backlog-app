@@ -4,10 +4,10 @@ import { View } from './Themed';
 import { MetacriticInfo } from '../types/MetacriticInfo';
 import { MetacriticElement } from './MetacriticElement';
 
-export function GameImageAndMetacritic({ image, alternativeImage, metacriticInfo }: { image: string, alternativeImage: string | undefined, metacriticInfo: MetacriticInfo | undefined }) {
-
+export function GameImageAndMetacritic({ image, alternativeImage, metacriticInfo }: Readonly<{
+    image: string, alternativeImage: string | undefined, metacriticInfo: MetacriticInfo | undefined
+}>) {
     const imageUri = image || (alternativeImage ? 'https://howlongtobeat.com/games/' + alternativeImage : null);
-
     return (
         <View style={styles.imageContainer}>
             {imageUri && <Image source={{ uri: imageUri }} style={styles.image} />}

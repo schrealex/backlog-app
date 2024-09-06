@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { View } from '../components/Themed';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { Firestore } from 'firebase/firestore';
 import { collection, getDocs } from 'firebase/firestore/lite';
 import { firestore } from '../firebaseConfig';
 import { SortProperty } from '../constants/SortProperty';
@@ -14,6 +13,7 @@ import SortButton from '../components/SortButton';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { FilterButton } from '../components/FilterButton';
 import { ListItemView } from '../components/ListItemView';
+import { sortAlphabetical } from '../utilities/Utilities';
 
 export default function FullListScreen() {
     const [isLoading, setIsLoading] = useState(true);
@@ -23,8 +23,8 @@ export default function FullListScreen() {
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
     const [refreshing, setRefreshing] = useState(false);
 
-    const getAllTheGames = async (fs: Firestore) => {
-        const fullGamesList = collection(fs, 'full-games-list');
+    const getAllTheGames = async () => {
+        const fullGamesList = collection(firestore, 'full-games-list');
         const fullGamesListSnapshot = await getDocs(fullGamesList);
         return fullGamesListSnapshot.docs.map(doc => {
             const documentId = doc.id;
@@ -35,8 +35,8 @@ export default function FullListScreen() {
 
     const getFullListOfGames = async (mounted: boolean) => {
         try {
-            const allTheGames = await getAllTheGames(firestore);
-            const sortedGamesList = sortAlphabetical(allTheGames);
+            const allTheGames = await getAllTheGames();
+            const sortedGamesList = sortAlphabetical(allTheGames, true);
 
             if (mounted) {
                 setFullList(sortedGamesList);
@@ -63,7 +63,7 @@ export default function FullListScreen() {
     }, []);
 
     useEffect(() => {
-        const sortedList = sortAlphabetical(fullListData);
+        const sortedList = sortAlphabetical(fullListData, sortAscending);
         setFullListData(sortedList);
     }, [sortBy, sortAscending]);
 
@@ -71,10 +71,6 @@ export default function FullListScreen() {
         setRefreshing(true);
         getFullListOfGames(true).then(() => setRefreshing(false));
     }, []);
-
-    const sortAlphabetical = (list: any) => {
-        return list.sort((a: any, b: any) => (sortAscending ? 1 : -1) * a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
-    };
 
     const setFullListDataWithFilter = (filterFn: () => Game[]) => {
         setFullListData(filterFn());

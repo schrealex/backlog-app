@@ -11,6 +11,7 @@ import { SortProperty } from '../constants/SortProperty';
 import { GameCopy } from '../constants/GameCopy';
 import { Completion } from '../constants/Completion';
 import { Game } from '../types/Game';
+import { sortAlphabetical } from '../utilities/Utilities';
 
 function ButtonContent({ sortBy, sortAscending }: any) {
     return (
@@ -80,78 +81,34 @@ export default function FinishedListScreen() {
         };
     }, []);
 
-    const isAll = () => {
-        setFullListData(getAll());
+    const filterList = (filterFunction: () => any[]) => {
+        setFullListData(filterFunction());
     };
 
-    const isPhysical = () => {
-        setFullListData(getOnlyPhysical());
-    };
+    const isAll = () => filterList(getAll);
+    const isPhysical = () => filterList(getOnlyPhysical);
+    const isDigital = () => filterList(getOnlyDigital);
+    const isBoth = () => filterList(getBoth);
+    const isBeaten = () => filterList(getBeaten);
+    const isCompleted = () => filterList(getCompleted);
 
-    const isDigital = () => {
-        setFullListData(getOnlyDigital());
-    };
-
-    const isBoth = () => {
-        setFullListData(getBoth());
-    };
-
-    const isBeaten = () => {
-        setFullListData(getBeaten());
-    };
-
-    const isCompleted = () => {
-        setFullListData(getCompleted());
-    };
-
-    const getAll = () => {
-        return fullList;
-    };
-
-    const getOnlyPhysical = () => {
-        return fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
-    };
-
-    const getOnlyDigital = () => {
-        return fullList.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
-    };
-
-    const getBoth = () => {
-        return fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL) && game.gameCopy.includes(GameCopy.DIGITAL));
-    };
-
-    const getBeaten = () => {
-        return fullList.filter((game: any) => game.completion === Completion.BEATEN);
-    };
-
-    const getCompleted = () => {
-        return fullList.filter((game: any) => game.completion === Completion.COMPLETED);
-    };
+    const getAll = () => fullList;
+    const getOnlyPhysical = () => fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
+    const getOnlyDigital = () => fullList.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
+    const getBoth = () => fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL) && game.gameCopy.includes(GameCopy.DIGITAL));
+    const getBeaten = () => fullList.filter((game: any) => game.completion === Completion.BEATEN);
+    const getCompleted = () => fullList.filter((game: any) => game.completion === Completion.COMPLETED);
 
     const toggleSort = () => {
-        if (sortBy === SortProperty.ALPHABETICAL && sortAscending) {
-            setSortBy(SortProperty.ALPHABETICAL);
-            setSortAscending(false);
-            sortAlphabetical();
-        } else if (sortBy === SortProperty.ALPHABETICAL && !sortAscending) {
-            setSortBy(SortProperty.ALPHABETICAL);
-            setSortAscending(true);
-            sortAlphabetical();
-        }
-    };
-
-    const sortAlphabetical = () => {
-
-        const sortedList = [...fullListData].sort((a: any, b: any) => {
-            return sortAscending ? b.title.toLowerCase().localeCompare(a.title.toLowerCase()) :
-                a.title.toLowerCase().localeCompare(b.title.toLowerCase());
-        });
-        setFullListData(sortedList);
+        const sortingAscending = !(sortBy === SortProperty.ALPHABETICAL && sortAscending);
+        setSortBy(SortProperty.ALPHABETICAL);
+        setSortAscending(sortingAscending);
+        const sortedGamesList = sortAlphabetical(fullListData, sortingAscending);
+        setFullListData(sortedGamesList);
     };
 
     const onClick = (clickedItemId: number): void => {
         const updatedList = fullList.map((item: Game) => {
-
             if (item.id === clickedItemId) {
                 return { ...item, isMenuOpen: !item.isMenuOpen };
             } else {
