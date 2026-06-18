@@ -20,7 +20,7 @@ const ListItem = React.memo(({ item, type, isOpen, onClick }: { item: Game, type
                         <Text style={styles.title}>{item.title}</Text>
                         <GameCopyElement gameCopyType={item.gameCopy} />
                     </View>
-                    { type === 'BACKLOG' || type === 'RETRO_BACKLOG' ? <HLTBElement item={item} /> : null }
+                    { (type === 'BACKLOG' || type === 'RETRO_BACKLOG') && <HLTBElement item={item} /> }
                 </View>
             </View>
         </Pressable>

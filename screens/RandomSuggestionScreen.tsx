@@ -6,6 +6,7 @@ import { View } from '../components/Themed';
 import ListItem from '../components/ListItem';
 import { Cache } from '../interfaces/Cache';
 import { Game } from '../types/Game';
+import { getHLTBInformation } from '../services/InformationService';
 
 export default function RandomSuggestionScreen() {
     const [isLoading, setIsLoading] = useState(true);
@@ -35,11 +36,12 @@ export default function RandomSuggestionScreen() {
             console.error('Random backlog suggestion fetch failed');
             setIsLoading(false);
         }
-        const result = await randomSuggestion.json() as Game;
+        const game = await randomSuggestion.json() as Game;
+        game.hltbInfo = await getHLTBInformation(game.title);
 
-        getRandomBacklogSuggestion.cache['random'] = result;
+        getRandomBacklogSuggestion.cache['random'] = game;
 
-        setRandomSuggestion(result);
+        setRandomSuggestion(game);
         setIsLoading(false);
 
     };

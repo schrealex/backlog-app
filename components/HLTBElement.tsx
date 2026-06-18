@@ -12,18 +12,18 @@ export function HLTBElement({ item }: { item: Game }) {
                 <View style={styles.timeToBeatElement}>
                     <FontAwesome5 name="clock" size={20} color="gold" style={{ backgroundColor: 'rgba(243,197,0,0.34)', borderRadius: 50, padding: 8 }}/>
                     <View style={styles.timeToBeatWrapper}>
-                        { (item.hltbInfo.comp_main || item.hltbInfo.comp_plus) && (
+                        { (item.hltbInfo.comp_main || item.hltbInfo.comp_plus) ? (
                             <HLTBIconAndTextElement
                                 time={item.hltbInfo.comp_main > 0 ? item.hltbInfo.comp_main : item.hltbInfo.comp_plus}
                                 icon="flag-checkered"
                             />
-                        )}
-                        { item.hltbInfo.comp_100 > 0 && (
+                        ) : null }
+                        { item.hltbInfo.comp_100 > 0 ? (
                             <HLTBIconAndTextElement
                                 time={item.hltbInfo.comp_100}
                                 icon="trophy"
                             />
-                        )}
+                        ) : null }
                     </View>
                 </View>
             }

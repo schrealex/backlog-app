@@ -7,12 +7,10 @@ import { GameCopy } from '../constants/GameCopy';
 import { Completion } from '../constants/Completion';
 import { SortProperty } from '../constants/SortProperty';
 
-const memoizee = require('memoizee');
-
 const ButtonGroup = ({ items, setBacklogData, setSortAscending, setSortBy } : { items: any, setBacklogData: any, setSortAscending: any, setSortBy: any }) => {
 
-    const setFilteredDataAndResetSort = (filterFunction: (items: Game[]) => Game[]) => {
-        setBacklogData(filterFunction(items));
+    const setFilteredDataAndResetSort = (filterFunction: () => Game[]) => {
+        setBacklogData(filterFunction());
         resetSort();
     };
 
@@ -22,15 +20,22 @@ const ButtonGroup = ({ items, setBacklogData, setSortAscending, setSortBy } : { 
     const isPlaying = () => setFilteredDataAndResetSort(getPlaying);
     const isPaused = () => setFilteredDataAndResetSort(getPaused);
 
-    const getFilteredGames = memoizee((items: Game[], filterFn: (game: Game) => boolean) => {
-        return items.filter(filterFn);
-    });
+    const filteredGroups = React.useMemo(() => {
+        const sourceItems = items as Game[];
+        return {
+            all: sourceItems,
+            onlyPhysical: sourceItems.filter((game: Game) => game.gameCopy.includes(GameCopy.PHYSICAL)),
+            onlyDigital: sourceItems.filter((game: Game) => game.gameCopy.includes(GameCopy.DIGITAL)),
+            playing: sourceItems.filter((game: Game) => game.completion === Completion.PLAYING),
+            paused: sourceItems.filter((game: Game) => game.completion === Completion.PAUSED),
+        };
+    }, [items]);
 
-    const getAll = () => items;
-    const getOnlyPhysical = (items: Game[]) => getFilteredGames(items, (game: Game) => game.gameCopy.includes(GameCopy.PHYSICAL));
-    const getOnlyDigital = (items: Game[]) => getFilteredGames(items, (game: Game) => game.gameCopy.includes(GameCopy.DIGITAL));
-    const getPlaying = (items: Game[]) => getFilteredGames(items, (game: Game) => game.completion === Completion.PLAYING);
-    const getPaused = (items: Game[]) => getFilteredGames(items, (game: Game) => game.completion === Completion.PAUSED);
+    const getAll = () => filteredGroups.all;
+    const getOnlyPhysical = () => filteredGroups.onlyPhysical;
+    const getOnlyDigital = () => filteredGroups.onlyDigital;
+    const getPlaying = () => filteredGroups.playing;
+    const getPaused = () => filteredGroups.paused;
 
     const resetSort = () => {
         setSortAscending(true);
@@ -39,10 +44,10 @@ const ButtonGroup = ({ items, setBacklogData, setSortAscending, setSortBy } : { 
 
     const buttonData = [
         { onPress: isAll, text: 'All ', numberOfItems: getAll()?.length },
-        { onPress: isPhysical, icon: "sd-card", numberOfItems: getOnlyPhysical(items)?.length },
-        { onPress: isDigital, icon: "cloud-download-alt", numberOfItems: getOnlyDigital(items)?.length },
-        { onPress: isPlaying, icon: "gamepad", numberOfItems: getPlaying(items)?.length },
-        { onPress: isPaused, icon: "pause", numberOfItems: getPaused(items)?.length },
+        { onPress: isPhysical, icon: "sd-card", numberOfItems: getOnlyPhysical()?.length },
+        { onPress: isDigital, icon: "cloud-download-alt", numberOfItems: getOnlyDigital()?.length },
+        { onPress: isPlaying, icon: "gamepad", numberOfItems: getPlaying()?.length },
+        { onPress: isPaused, icon: "pause", numberOfItems: getPaused()?.length },
     ];
 
     return (
