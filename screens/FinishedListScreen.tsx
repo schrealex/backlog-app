@@ -11,7 +11,8 @@ import { SortProperty } from '../constants/SortProperty';
 import { GameCopy } from '../constants/GameCopy';
 import { Completion } from '../constants/Completion';
 import { Game } from '../types/Game';
-import { sortAlphabetical } from '../utilities/Utilities';
+import { getImagePrefetchUris, sortAlphabetical } from '../utilities/Utilities';
+import { Image } from 'expo-image';
 
 function ButtonContent({ sortBy, sortAscending }: any) {
     return (
@@ -123,6 +124,15 @@ export default function FinishedListScreen() {
         getFullListOfGames(true).then(() => setRefreshing(false));
     }, []);
 
+    useEffect(() => {
+        const imageUris = getImagePrefetchUris(fullListData);
+        if (!imageUris.length) {
+            return;
+        }
+
+        void Image.prefetch(imageUris);
+    }, [fullListData]);
+
     return (
         <View style={styles.container}>
             <View style={styles.buttonGroup}>
@@ -160,7 +170,12 @@ export default function FinishedListScreen() {
             {isLoading ?
                 <ActivityIndicator style={styles.loadingSpinner} size="large" color="#fff" /> :
                 <FlatList
+                    removeClippedSubviews
                     data={fullListData}
+                    initialNumToRender={8}
+                    maxToRenderPerBatch={8}
+                    updateCellsBatchingPeriod={50}
+                    windowSize={6}
                     keyExtractor={(item => item.id.toString())}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh}/>

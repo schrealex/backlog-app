@@ -1,9 +1,20 @@
 import * as React from 'react';
+import { Image } from 'expo-image';
 import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 import ListItem from './ListItem';
 import { Game } from '../types/Game';
+import { getImagePrefetchUris } from '../utilities/Utilities';
 
 export function ListItemView({ listData, setListData, listType, refreshing, onRefresh }: { listData: any, setListData: any, listType: string, refreshing: boolean, onRefresh: any }) {
+
+    React.useEffect(() => {
+        const imageUris = getImagePrefetchUris(listData);
+        if (!imageUris.length) {
+            return;
+        }
+
+        void Image.prefetch(imageUris);
+    }, [listData]);
 
     const onClick = (clickedItemId: number): void => {
         const updatedList = listData.map((item: Game) => {
@@ -24,10 +35,10 @@ export function ListItemView({ listData, setListData, listType, refreshing, onRe
         <FlatList
             removeClippedSubviews
             data={listData}
-            initialNumToRender={6}
-            maxToRenderPerBatch={6}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
             updateCellsBatchingPeriod={50}
-            windowSize={5}
+            windowSize={6}
             keyExtractor={(item => item.id.toString())}
             refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh}/>

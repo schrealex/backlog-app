@@ -35,4 +35,21 @@ const sortByHLTB = (list: any, sortAscending: boolean) => {
     });
 };
 
-export { filterCharacters, sortAlphabetical, sortByHLTB }
+const HLTB_IMAGE_BASE_URL = 'https://howlongtobeat.com/games/';
+
+const getGameImageUri = (image?: string, alternativeImage?: string) => {
+    if (image) {
+        return image;
+    }
+
+    return alternativeImage ? `${HLTB_IMAGE_BASE_URL}${alternativeImage}` : '';
+};
+
+const getImagePrefetchUris = (games: any[], limit = 12) => {
+    return [...new Set(games
+        .map((game) => getGameImageUri(game.image, game.hltbInfo?.game_image))
+        .filter(Boolean))]
+        .slice(0, limit) as string[];
+};
+
+export { filterCharacters, sortAlphabetical, sortByHLTB, getGameImageUri, getImagePrefetchUris }
