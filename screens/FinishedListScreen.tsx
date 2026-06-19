@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: 10,
         fontSize: 16,
-        width: 'min-content',
+        width: 'auto',
     },
     buttonGroup: {
         display: 'flex',
