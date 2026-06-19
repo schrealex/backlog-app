@@ -9,6 +9,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as React from 'react';
 import { ColorSchemeName } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Colors from '../constants/Colors';
 import ModalScreen from '../screens/ModalScreen';
@@ -57,12 +58,18 @@ const BacklogScreen = (props: any) => <BaseBacklogScreen {...props} screenType="
 const RetroBacklogScreen = (props: any) => <BaseBacklogScreen {...props} screenType="RetroBacklog" />;
 
 function BottomTabNavigator() {
+    const insets = useSafeAreaInsets();
+
     return (
         <BottomTab.Navigator
             initialRouteName="Backlog"
             screenOptions={{
                 tabBarActiveTintColor: Colors['dark'].tint,
-                tabBarStyle: [{ height: 66, paddingTop: 4, paddingBottom: 10 }]
+                tabBarStyle: {
+                    height: 56 + insets.bottom,
+                    paddingTop: 4,
+                    paddingBottom: Math.max(insets.bottom, 8),
+                }
             }}>
             <BottomTab.Screen
                 name="Backlog"
