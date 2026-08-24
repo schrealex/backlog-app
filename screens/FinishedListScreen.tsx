@@ -8,7 +8,7 @@ import { Firestore } from 'firebase/firestore';
 import {collection, getDocs, query, where} from 'firebase/firestore/lite';
 import { firestore } from '../firebaseConfig';
 import { SortProperty } from '../constants/SortProperty';
-import { GameCopy } from '../constants/GameCopy';
+import { GameFilter, applyGameFilter } from '../constants/GameFilter';
 import { Completion } from '../constants/Completion';
 import { Game } from '../types/Game';
 import { getImagePrefetchUris, sortAlphabetical } from '../utilities/Utilities';
@@ -29,109 +29,127 @@ function ButtonContent({ sortBy, sortAscending }: any) {
 
 export default function FinishedListScreen() {
     const [isLoading, setIsLoading] = useState(true);
-    const [fullList, setFullList]: Array<any> = useState([]);
-    const [fullListData, setFullListData]: Array<any> = useState([]);
+    const [fullList, setFullList] = useState<Game[]>([]);
+    const [activeFilter, setActiveFilter] = useState<GameFilter>(GameFilter.ALL);
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
     const [refreshing, setRefreshing] = useState(false);
 
-    const getAllTheGames = async (fs: Firestore) => {
+    const isMountedRef = React.useRef(true);
+    const fullListRef = React.useRef<Game[]>([]);
+    const prefetchedUrisRef = React.useRef<Set<string>>(new Set());
+
+    // Dit scherm toont alleen afgeronde games; wijzigt de status naar iets anders,
+    // dan verdwijnt het item automatisch uit de afgeleide lijst.
+    const fullListData = React.useMemo(() => {
+        const finishedGames = fullList.filter((game) => game.completion === Completion.BEATEN || game.completion === Completion.COMPLETED);
+        return sortAlphabetical(applyGameFilter(finishedGames, activeFilter), sortAscending);
+    }, [fullList, activeFilter, sortAscending]);
+
+    const counts = React.useMemo(() => {
+        const finishedGames = fullList.filter((game) => game.completion === Completion.BEATEN || game.completion === Completion.COMPLETED);
+        return [GameFilter.ALL, GameFilter.PHYSICAL, GameFilter.DIGITAL, GameFilter.BOTH, GameFilter.BEATEN, GameFilter.COMPLETED]
+            .reduce((accumulator, filter) => {
+                accumulator[filter] = applyGameFilter(finishedGames, filter).length;
+                return accumulator;
+            }, {} as Record<string, number>);
+    }, [fullList]);
+
+    const getAllTheGames = async (fs: Firestore): Promise<Game[]> => {
         const fullGamesList = collection(fs, 'full-games-list');
         const whereQuery = query(fullGamesList, where('completion', 'in', ['Beaten', 'Completed']));
         const fullGamesListSnapshot = await getDocs(whereQuery);
         return fullGamesListSnapshot.docs.map(doc => {
             const documentId = doc.id;
             const data = doc.data();
-            return { ...data, documentId };
+            return { ...data, documentId, isMenuOpen: false } as Game;
         });
     };
 
-    const sortGamesAlphabetical = (games: any) => {
-        return games.sort((a: any, b: any) => {
-            return sortAscending ? a.title.toLowerCase().localeCompare(b.title.toLowerCase()) :
-                b.title.toLowerCase().localeCompare(a.title.toLowerCase());
-        });
-    };
-
-    async function getFullListOfGames(mounted: boolean) {
-        try {
-            const allTheGames = await getAllTheGames(firestore);
-            const sortedGamesList = sortGamesAlphabetical(allTheGames);
-
-            if (mounted) {
-                setFullList(sortedGamesList);
-                setFullListData(sortedGamesList);
-                setIsLoading(false);
-            }
-
-        } catch (error: any) {
-            if (mounted) {
-                setIsLoading(false);
-            }
-        }
-    }
-
-    useEffect(() => {
-        let mounted = true;
-        if (mounted) {
-            void getFullListOfGames(mounted);
-        }
-
-        return function cleanUp() {
-            mounted = false;
-        };
+    const setGames = useCallback((games: Game[]) => {
+        fullListRef.current = games;
+        setFullList(games);
     }, []);
 
-    const filterList = (filterFunction: () => any[]) => {
-        setFullListData(filterFunction());
+    const updateGames = useCallback((updater: (currentGames: Game[]) => Game[]) => {
+        setGames(updater(fullListRef.current));
+    }, [setGames]);
+
+    const onCompletionChange = useCallback((gameId: number, completion: string) => {
+        updateGames((currentGames) => currentGames.map((game) => {
+            if (game.id === gameId) {
+                return { ...game, completion, isMenuOpen: false };
+            }
+
+            return game.isMenuOpen ? { ...game, isMenuOpen: false } : game;
+        }));
+    }, [updateGames]);
+
+    const getFullListOfGames = useCallback(async () => {
+        try {
+            const allTheGames = await getAllTheGames(firestore);
+
+            if (isMountedRef.current) {
+                setGames(allTheGames);
+                setIsLoading(false);
+            }
+        } catch (error: any) {
+            if (isMountedRef.current) {
+                setIsLoading(false);
+            }
+        }
+    }, [setGames]);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        void getFullListOfGames();
+
+        return function cleanUp() {
+            isMountedRef.current = false;
+        };
+    }, [getFullListOfGames]);
+
+    const selectFilter = (filter: GameFilter) => {
+        setActiveFilter(filter);
+        setSortBy(SortProperty.ALPHABETICAL);
     };
-
-    const isAll = () => filterList(getAll);
-    const isPhysical = () => filterList(getOnlyPhysical);
-    const isDigital = () => filterList(getOnlyDigital);
-    const isBoth = () => filterList(getBoth);
-    const isBeaten = () => filterList(getBeaten);
-    const isCompleted = () => filterList(getCompleted);
-
-    const getAll = () => fullList;
-    const getOnlyPhysical = () => fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL));
-    const getOnlyDigital = () => fullList.filter((game: any) => game.gameCopy.includes(GameCopy.DIGITAL));
-    const getBoth = () => fullList.filter((game: any) => game.gameCopy.includes(GameCopy.PHYSICAL) && game.gameCopy.includes(GameCopy.DIGITAL));
-    const getBeaten = () => fullList.filter((game: any) => game.completion === Completion.BEATEN);
-    const getCompleted = () => fullList.filter((game: any) => game.completion === Completion.COMPLETED);
 
     const toggleSort = () => {
         const sortingAscending = !(sortBy === SortProperty.ALPHABETICAL && sortAscending);
         setSortBy(SortProperty.ALPHABETICAL);
         setSortAscending(sortingAscending);
-        const sortedGamesList = sortAlphabetical(fullListData, sortingAscending);
-        setFullListData(sortedGamesList);
     };
 
-    const onClick = (clickedItemId: number): void => {
-        const updatedList = fullList.map((item: Game) => {
+    const onClick = useCallback((clickedItemId: number): void => {
+        updateGames((currentGames) => currentGames.map((item: Game) => {
             if (item.id === clickedItemId) {
                 return { ...item, isMenuOpen: !item.isMenuOpen };
-            } else {
-                return { ...item, isMenuOpen: false };
             }
-        });
-        setFullListData(updatedList);
-    }
+
+            return item.isMenuOpen ? { ...item, isMenuOpen: false } : item;
+        }));
+    }, [updateGames]);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        getFullListOfGames(true).then(() => setRefreshing(false));
-    }, []);
+        void getFullListOfGames().finally(() => setRefreshing(false));
+    }, [getFullListOfGames]);
 
     useEffect(() => {
-        const imageUris = getImagePrefetchUris(fullListData);
+        const imageUris = getImagePrefetchUris(fullListData)
+            .filter((uri) => !prefetchedUrisRef.current.has(uri));
+
         if (!imageUris.length) {
             return;
         }
 
+        imageUris.forEach((uri) => prefetchedUrisRef.current.add(uri));
         void Image.prefetch(imageUris);
     }, [fullListData]);
+
+    const renderItem = useCallback(({ item }: { item: Game }) => (
+        <ListItem item={item} type={'FULL_LIST'} isOpen={item.isMenuOpen} onClick={onClick} onCompletionChange={onCompletionChange} />
+    ), [onClick, onCompletionChange]);
 
     return (
         <View style={styles.container}>
@@ -141,30 +159,31 @@ export default function FinishedListScreen() {
                 </Pressable>
             </View>
             <View style={styles.buttonGroup}>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isAll}>
-                    <Text style={styles.buttonText}>All [{getAll().length}]</Text>
+                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, activeFilter === GameFilter.ALL ? styles.activeButton : null]} onPress={() => selectFilter(GameFilter.ALL)}>
+                    <Text style={styles.buttonText}>All [{counts[GameFilter.ALL] ?? 0}]</Text>
                 </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isPhysical}>
+                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, activeFilter === GameFilter.PHYSICAL ? styles.activeButton : null]} onPress={() => selectFilter(GameFilter.PHYSICAL)}>
                     <FontAwesome5 name="sd-card" size={20} color="red" style={{ paddingRight: 5 }} />
-                    <Text style={styles.buttonText}>[{getOnlyPhysical().length}]</Text>
+                    <Text style={styles.buttonText}>[{counts[GameFilter.PHYSICAL] ?? 0}]</Text>
                 </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isDigital}>
-                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getOnlyDigital().length}]</Text>
+                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, activeFilter === GameFilter.DIGITAL ? styles.activeButton : null]} onPress={() => selectFilter(GameFilter.DIGITAL)}>
+                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} />
+                    <Text style={styles.buttonText}>[{counts[GameFilter.DIGITAL] ?? 0}]</Text>
                 </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isBoth}>
-                    <FontAwesome5 name="sd-card" size={20} color="red" style={{ paddingRight: 5 }} /><FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getBoth().length}]</Text>
+                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, activeFilter === GameFilter.BOTH ? styles.activeButton : null]} onPress={() => selectFilter(GameFilter.BOTH)}>
+                    <FontAwesome5 name="sd-card" size={20} color="red" style={{ paddingRight: 5 }} />
+                    <FontAwesome5 name="cloud-download-alt" size={20} color="red" style={{ paddingRight: 5 }} />
+                    <Text style={styles.buttonText}>[{counts[GameFilter.BOTH] ?? 0}]</Text>
                 </Pressable>
             </View>
             <View style={styles.buttonGroup}>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isBeaten}>
-                    <FontAwesome5 name="fist-raised" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getBeaten().length}]</Text>
+                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, activeFilter === GameFilter.BEATEN ? styles.activeButton : null]} onPress={() => selectFilter(GameFilter.BEATEN)}>
+                    <FontAwesome5 name="fist-raised" size={20} color="red" style={{ paddingRight: 5 }} />
+                    <Text style={styles.buttonText}>[{counts[GameFilter.BEATEN] ?? 0}]</Text>
                 </Pressable>
-                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button]} onPress={isCompleted}>
-                    <FontAwesome5 name="trophy" size={20} color="red" style={{ paddingRight: 5 }} /><Text
-                    style={styles.buttonText}>[{getCompleted().length}]</Text>
+                <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, activeFilter === GameFilter.COMPLETED ? styles.activeButton : null]} onPress={() => selectFilter(GameFilter.COMPLETED)}>
+                    <FontAwesome5 name="trophy" size={20} color="red" style={{ paddingRight: 5 }} />
+                    <Text style={styles.buttonText}>[{counts[GameFilter.COMPLETED] ?? 0}]</Text>
                 </Pressable>
             </View>
             {isLoading ?
@@ -172,17 +191,15 @@ export default function FinishedListScreen() {
                 <FlatList
                     removeClippedSubviews
                     data={fullListData}
-                    initialNumToRender={8}
-                    maxToRenderPerBatch={8}
+                    initialNumToRender={6}
+                    maxToRenderPerBatch={6}
                     updateCellsBatchingPeriod={50}
-                    windowSize={6}
+                    windowSize={5}
                     keyExtractor={(item => item.id.toString())}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh}/>
                     }
-                    renderItem={({ item }) => (
-                        <ListItem item={item} type={'FULL_LIST'} isOpen={item.isMenuOpen} onClick={() => onClick(item.id)}  />
-                    )}
+                    renderItem={renderItem}
                 />}
         </View>
     );
@@ -238,5 +255,8 @@ const styles = StyleSheet.create({
     buttonText: {
         color: '#ffffff',
         display: 'flex',
+    },
+    activeButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
     }
 });

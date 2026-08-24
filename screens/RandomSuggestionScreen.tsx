@@ -53,6 +53,10 @@ export default function RandomSuggestionScreen() {
         setRandomSuggestion(randomItemWithMenu);
     }
 
+    const onCompletionChange = (_gameId: number, completion: string): void => {
+        setRandomSuggestion((current: Game) => ({ ...current, completion, isMenuOpen: false }));
+    };
+
     return (
         <View style={styles.container}>
             <View style={styles.buttonGroup}>
@@ -65,7 +69,7 @@ export default function RandomSuggestionScreen() {
             {isLoading ?
                 <ActivityIndicator style={styles.loadingSpinner} size="large" color="#fff" /> :
                 <View style={styles.list}>
-                    <ListItem item={randomSuggestion} type={'BACKLOG'} isOpen={randomSuggestion.isMenuOpen} onClick={() => onClick(randomSuggestion)} />
+                    <ListItem item={randomSuggestion} type={'BACKLOG'} isOpen={randomSuggestion.isMenuOpen} onClick={() => onClick(randomSuggestion)} onCompletionChange={onCompletionChange} />
                 </View>
             }
         </View>

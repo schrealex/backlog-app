@@ -5,20 +5,31 @@ import { firestore } from '../firebaseConfig';
 import { Text } from './Themed';
 import { useState } from 'react';
 
-export function CompletionStatusesMenuItem({ type, item, completionStatus, onClick }: { type: string, item: any, completionStatus: string, onClick: any }) {
+export function CompletionStatusesMenuItem({ type, item, completionStatus, onClick, onCompletionChange }: { type: string, item: any, completionStatus: string, onClick: any, onCompletionChange?: (gameId: number, completion: string) => void }) {
 
     const [ isPressed, setIsPressed ] = useState(false);
 
 
     const changeStatus = (status: string): void => {
-        item.completion = status;
-
         void updateFirebaseDocumentWithStatus(status);
+
+        if (onCompletionChange) {
+            // De lijst wordt via de state bijgewerkt; dat sluit ook het menu.
+            onCompletionChange(item.id, status);
+            return;
+        }
+
+        item.completion = status;
         onClick();
     };
 
     const updateFirebaseDocumentWithStatus = async (status: string) => {
         const path = (type === 'BACKLOG' || type === 'FULL_LIST') ? 'full-games-list' : type === 'RETRO_BACKLOG' ? 'retro-backlog' : '';
+        if (!path || !item.documentId) {
+            console.error({ call: 'updateFirebaseDocumentWithStatus', message: 'Missing path or documentId', path, documentId: item.documentId, timestamp: new Date().toISOString() });
+            return;
+        }
+
         const documentReference = doc(firestore, path, item.documentId);
         updateDoc(documentReference, {
             completion: status

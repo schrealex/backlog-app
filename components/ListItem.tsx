@@ -8,11 +8,13 @@ import { HLTBElement } from './HLTBElement';
 import { GameImageAndMetacritic } from './GameImageAndMetacritic';
 import { Game } from '../types/Game';
 
-const ListItem = React.memo(({ item, type, isOpen, onClick }: { item: Game, type: string, isOpen: any, onClick: () => void }) => {
+const ListItem = React.memo(({ item, type, isOpen, onClick, onCompletionChange }: { item: Game, type: string, isOpen: any, onClick: (id: number) => void, onCompletionChange?: (gameId: number, completion: string) => void }) => {
+    const handlePress = React.useCallback(() => onClick(item.id), [onClick, item.id]);
+
     return (
-        <Pressable onPress={onClick}>
+        <Pressable onPress={handlePress}>
             <View style={styles.item}>
-                {isOpen ? <View style={styles.menu}><CompletionStatusesMenu type={type} item={item} onClick={onClick} /></View> : null}
+                {isOpen ? <View style={styles.menu}><CompletionStatusesMenu type={type} item={item} onClick={handlePress} onCompletionChange={onCompletionChange} /></View> : null}
                 <GameImageAndMetacritic image={item.image} alternativeImage={item.hltbInfo?.game_image} metacriticInfo={item.metacriticInfo} />
                 <View style={styles.line}>
                     <View style={styles.inline}>

@@ -2,6 +2,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
+import { warmUpBacklogCache } from '../services/BacklogCacheService';
 
 export default function useCachedResources() {
   const [isLoadingComplete, setLoadingComplete] = useState(false);
@@ -11,6 +12,9 @@ export default function useCachedResources() {
     async function loadResourcesAndDataAsync() {
       try {
         SplashScreen.preventAutoHideAsync();
+
+        // Read cached backlog while loading the fonts (non-blocking).
+        warmUpBacklogCache();
 
         // Load fonts
         await Font.loadAsync({

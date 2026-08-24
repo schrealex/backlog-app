@@ -3,57 +3,44 @@ import { StyleSheet } from 'react-native';
 import { View } from './Themed';
 import { FilterButton } from './FilterButton';
 import { Game } from '../types/Game';
-import { GameCopy } from '../constants/GameCopy';
-import { Completion } from '../constants/Completion';
+import { GameFilter, applyGameFilter } from '../constants/GameFilter';
 import { SortProperty } from '../constants/SortProperty';
 
-const ButtonGroup = ({ items, setBacklogData, setSortAscending, setSortBy } : { items: any, setBacklogData: any, setSortAscending: any, setSortBy: any }) => {
+const buttonDefinitions: Array<{ filter: GameFilter, icon?: string, text?: string }> = [
+    { filter: GameFilter.ALL, text: 'All ' },
+    { filter: GameFilter.PHYSICAL, icon: 'sd-card' },
+    { filter: GameFilter.DIGITAL, icon: 'cloud-download-alt' },
+    { filter: GameFilter.PLAYING, icon: 'gamepad' },
+    { filter: GameFilter.PAUSED, icon: 'pause' },
+];
 
-    const setFilteredDataAndResetSort = (filterFunction: () => Game[]) => {
-        setBacklogData(filterFunction());
-        resetSort();
-    };
+const ButtonGroup = ({ items, activeFilter, setActiveFilter, setSortAscending, setSortBy } : { items: Game[], activeFilter: GameFilter, setActiveFilter: (filter: GameFilter) => void, setSortAscending: any, setSortBy: any }) => {
 
-    const isAll = () => setFilteredDataAndResetSort(getAll);
-    const isPhysical = () => setFilteredDataAndResetSort(getOnlyPhysical);
-    const isDigital = () => setFilteredDataAndResetSort(getOnlyDigital);
-    const isPlaying = () => setFilteredDataAndResetSort(getPlaying);
-    const isPaused = () => setFilteredDataAndResetSort(getPaused);
-
-    const filteredGroups = React.useMemo(() => {
-        const sourceItems = items as Game[];
-        return {
-            all: sourceItems,
-            onlyPhysical: sourceItems.filter((game: Game) => game.gameCopy.includes(GameCopy.PHYSICAL)),
-            onlyDigital: sourceItems.filter((game: Game) => game.gameCopy.includes(GameCopy.DIGITAL)),
-            playing: sourceItems.filter((game: Game) => game.completion === Completion.PLAYING),
-            paused: sourceItems.filter((game: Game) => game.completion === Completion.PAUSED),
-        };
+    const counts = React.useMemo(() => {
+        const sourceItems = (items ?? []) as Game[];
+        return buttonDefinitions.reduce((accumulator, { filter }) => {
+            accumulator[filter] = applyGameFilter(sourceItems, filter).length;
+            return accumulator;
+        }, {} as Record<string, number>);
     }, [items]);
 
-    const getAll = () => filteredGroups.all;
-    const getOnlyPhysical = () => filteredGroups.onlyPhysical;
-    const getOnlyDigital = () => filteredGroups.onlyDigital;
-    const getPlaying = () => filteredGroups.playing;
-    const getPaused = () => filteredGroups.paused;
-
-    const resetSort = () => {
+    const selectFilter = (filter: GameFilter) => {
+        setActiveFilter(filter);
         setSortAscending(true);
         setSortBy(SortProperty.ALPHABETICAL);
     };
 
-    const buttonData = [
-        { onPress: isAll, text: 'All ', numberOfItems: getAll()?.length },
-        { onPress: isPhysical, icon: "sd-card", numberOfItems: getOnlyPhysical()?.length },
-        { onPress: isDigital, icon: "cloud-download-alt", numberOfItems: getOnlyDigital()?.length },
-        { onPress: isPlaying, icon: "gamepad", numberOfItems: getPlaying()?.length },
-        { onPress: isPaused, icon: "pause", numberOfItems: getPaused()?.length },
-    ];
-
     return (
         <View style={styles.buttonGroup}>
-            {buttonData.map((button, index) => (
-                <FilterButton key={index} filterFunction={button.onPress} iconName={button.icon} text={button.text} numberOfItems={button.numberOfItems} />
+            {buttonDefinitions.map(({ filter, icon, text }) => (
+                <FilterButton
+                    key={filter}
+                    filterFunction={() => selectFilter(filter)}
+                    iconName={icon}
+                    text={text}
+                    numberOfItems={counts[filter] ?? 0}
+                    isActive={activeFilter === filter}
+                />
             ))}
         </View>
     );

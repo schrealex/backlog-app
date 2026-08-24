@@ -5,6 +5,7 @@ export type Game = {
     isMenuOpen: boolean;
     completion: string,
     gameCopy: string[],
+    documentId?: string;
     id: number;
     image: string;
     title: string;

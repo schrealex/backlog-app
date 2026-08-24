@@ -1,79 +1,159 @@
 import * as React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
-import { collection, getDocs } from 'firebase/firestore/lite';
+import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { View } from '../components/Themed';
 import { Game } from '../types/Game';
 import { RootTabScreenProps } from '../types';
 import { SortProperty } from '../constants/SortProperty';
+import { Completion } from '../constants/Completion';
+import { GameFilter, applyGameFilter } from '../constants/GameFilter';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ListItemView } from '../components/ListItemView';
 import ButtonGroup from '../components/ButtonGroup';
 import SortButton from '../components/SortButton';
 import { GAME_INFORMATION_BASE_URL } from '../constants/Constants';
-import { sortAlphabetical, sortByHLTB } from '../utilities/Utilities';
+import { mergeGameInformation, sortAlphabetical, sortByHLTB } from '../utilities/Utilities';
 import { firestore } from '../firebaseConfig';
 import { loadBacklogFromStorage, saveBacklogToStorage } from '../services/BacklogCacheService';
 
-const backlogCache: Partial<Record<'Backlog' | 'RetroBacklog', Game[]>> = {};
+type BacklogScreenType = 'Backlog' | 'RetroBacklog';
 
-const collectionNameByScreenType: Record<'Backlog' | 'RetroBacklog', 'backlog' | 'retro-backlog'> = {
-    Backlog: 'backlog',
-    RetroBacklog: 'retro-backlog',
+const backlogCache: Partial<Record<BacklogScreenType, Game[]>> = {};
+
+// De 'backlog'-collectie bestaat niet meer; de backlog is de niet-afgeronde selectie
+// uit 'full-games-list'. Dit levert dezelfde set als het (trage) game-information endpoint.
+const collectionConfigByScreenType: Record<BacklogScreenType, { name: string, completionStatuses?: string[] }> = {
+    Backlog: {
+        name: 'full-games-list',
+        completionStatuses: [Completion.NOT_STARTED, Completion.PLAYING, Completion.PAUSED],
+    },
+    RetroBacklog: {
+        name: 'retro-backlog',
+    },
 };
 
-export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Backlog' | 'RetroBacklog'> & { screenType: 'Backlog' | 'RetroBacklog' }) {
+const defaultFilterByScreenType: Record<BacklogScreenType, GameFilter> = {
+    Backlog: GameFilter.PLAYING,
+    RetroBacklog: GameFilter.ALL,
+};
+
+const sortFunctions = {
+    [SortProperty.ALPHABETICAL]: sortAlphabetical,
+    [SortProperty.HLTB]: sortByHLTB,
+};
+
+const ENRICHMENT_TIMEOUT_MS = 25000;
+
+export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Backlog' | 'RetroBacklog'> & { screenType: BacklogScreenType }) {
 
     const [isLoading, setIsLoading] = useState(true);
-    const [backlogData, setBacklogData] = useState<Game[]>([]);
     const [fullBacklog, setFullBacklog] = useState<Game[]>([]);
+    const [activeFilter, setActiveFilter] = useState<GameFilter>(defaultFilterByScreenType[screenType]);
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const normalizeBacklogDataForScreen = (games: Game[]) => {
-        if (screenType === 'Backlog') {
-            return games.filter((game: Game) => game.completion === 'Playing');
+    const isMountedRef = useRef(true);
+    const hasNetworkDataRef = useRef(false);
+    const latestBacklogRef = useRef<Game[]>([]);
+
+    // De zichtbare lijst is afgeleide state: filter + sortering worden altijd opnieuw
+    // toegepast wanneer de onderliggende games wijzigen (bijv. na een statuswijziging).
+    const backlogData = useMemo(() => {
+        const filteredGames = applyGameFilter(fullBacklog, activeFilter);
+        const sortFunction = sortFunctions[sortBy];
+        return sortFunction ? sortFunction(filteredGames, sortAscending) : filteredGames;
+    }, [fullBacklog, activeFilter, sortBy, sortAscending]);
+
+    const setScreenData = useCallback((games: Game[], shouldPersist = true) => {
+        if (!isMountedRef.current) {
+            return;
         }
 
-        return games;
-    };
+        latestBacklogRef.current = games;
+        backlogCache[screenType] = games;
 
-    const setScreenData = (games: Game[], shouldPersist = true) => {
         setFullBacklog(games);
-        setBacklogData(normalizeBacklogDataForScreen(games));
         setIsLoading(false);
 
         if (shouldPersist) {
             void saveBacklogToStorage(screenType, games);
         }
-    };
+    }, [screenType]);
 
-    const getBacklogCoreData = async (): Promise<Game[]> => {
-        const backlogCollection = collection(firestore, collectionNameByScreenType[screenType]);
-        const snapshot = await getDocs(backlogCollection);
+    const updateBacklogItems = useCallback((updater: (currentGames: Game[]) => Game[], shouldPersist = false) => {
+        setScreenData(updater(latestBacklogRef.current), shouldPersist);
+    }, [setScreenData]);
+
+    const onCompletionChange = useCallback((gameId: number, completion: string) => {
+        updateBacklogItems((currentGames) => currentGames.map((game) => {
+            if (game.id === gameId) {
+                return { ...game, completion, isMenuOpen: false };
+            }
+
+            return game.isMenuOpen ? { ...game, isMenuOpen: false } : game;
+        }), true);
+    }, [updateBacklogItems]);
+
+    const getBacklogCoreData = useCallback(async (): Promise<Game[]> => {
+        const { name, completionStatuses } = collectionConfigByScreenType[screenType];
+        const backlogCollection = collection(firestore, name);
+        const backlogQuery = completionStatuses
+            ? query(backlogCollection, where('completion', 'in', completionStatuses))
+            : backlogCollection;
+        const snapshot = await getDocs(backlogQuery);
 
         return snapshot.docs.map((doc) => {
             const data = doc.data() as Partial<Game>;
             return {
                 ...data,
+                documentId: doc.id,
                 isMenuOpen: false,
             } as Game;
         });
-    };
+    }, [screenType]);
 
-    const getBacklog = async (waitForHydration = false) => {
+    const getFullBacklogWithInformation = useCallback(async (): Promise<Game[]> => {
+        const url = `${GAME_INFORMATION_BASE_URL}game-information?type=${screenType}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), ENRICHMENT_TIMEOUT_MS);
+
+        try {
+            const response = await fetch(url, { signal: controller.signal });
+            if (!response.ok) {
+                console.error({ call: 'getFullBacklogWithInformation response not OK', status: response.status, url, timestamp: new Date().toISOString() });
+                throw new Error('Response returned with not OK.');
+            }
+            return await response.json();
+        } catch (fetchError) {
+            console.error({ call: 'getFullBacklogWithInformation', error: fetchError, url, timestamp: new Date().toISOString() });
+            throw new Error('An error occurred while fetching the backlog.');
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }, [screenType]);
+
+    const getBacklog = useCallback(async () => {
         setError(null);
 
-        const fullBacklogPromise = getFullBacklogWithInformation()
-            .then((backlogWithAdditionalInformation: Game[]) => {
-                backlogCache[screenType] = backlogWithAdditionalInformation;
-                setScreenData(backlogWithAdditionalInformation);
+        // Achtergrondhydratie: deze trage call mag de eerste render nooit blokkeren.
+        const hydrationPromise = getFullBacklogWithInformation()
+            .then((enrichedBacklog: Game[]) => {
+                if (!isMountedRef.current || !enrichedBacklog?.length) {
+                    return;
+                }
+
+                hasNetworkDataRef.current = true;
+                const { games, hasChanges } = mergeGameInformation(latestBacklogRef.current, enrichedBacklog);
+                if (hasChanges) {
+                    setScreenData(games);
+                }
                 setError(null);
             })
             .catch(() => {
-                if (!backlogCache[screenType]?.length) {
+                if (isMountedRef.current && !latestBacklogRef.current.length) {
                     setError('An error occurred while fetching the backlog');
                     setIsLoading(false);
                 }
@@ -82,84 +162,63 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
         try {
             const coreBacklog = await getBacklogCoreData();
             if (coreBacklog.length) {
-                backlogCache[screenType] = coreBacklog;
-                setScreenData(coreBacklog);
-
-                if (!waitForHydration) {
-                    return;
-                }
+                hasNetworkDataRef.current = true;
+                const { games } = mergeGameInformation(coreBacklog, latestBacklogRef.current);
+                setScreenData(games);
             }
-        } catch (error) {
-            console.error({ call: 'getBacklogCoreData', error, screenType, timestamp: new Date().toISOString() });
+        } catch (coreError) {
+            console.error({ call: 'getBacklogCoreData', error: coreError, screenType, timestamp: new Date().toISOString() });
+        } finally {
+            if (isMountedRef.current && latestBacklogRef.current.length) {
+                setIsLoading(false);
+            }
         }
 
-        await fullBacklogPromise;
-    };
-
-    const getFullBacklogWithInformation = async () => {
-        const url = `${GAME_INFORMATION_BASE_URL}game-information?type=${screenType}`;
-        try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                console.error({ call: 'getFullBacklogWithInformation response not OK', response, error, url, timestamp: new Date().toISOString() });
-                throw new Error('Response returned with was not ok.');
-            }
-            return await response.json();
-        } catch (error) {
-            console.error({ call: 'getFullBacklogWithInformation', error, url, timestamp: new Date().toISOString() });
-            throw new Error('An error occurred while fetching the backlog.');
-        }
-    };
+        return hydrationPromise;
+    }, [getBacklogCoreData, getFullBacklogWithInformation, screenType, setScreenData]);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        getBacklog(false).then(() => setRefreshing(false));
-    }, []);
+        void getBacklog().finally(() => {
+            if (isMountedRef.current) {
+                setRefreshing(false);
+            }
+        });
+    }, [getBacklog]);
 
     useEffect(() => {
-        let mounted = true;
+        isMountedRef.current = true;
+        hasNetworkDataRef.current = false;
+        latestBacklogRef.current = [];
 
         const cachedBacklog = backlogCache[screenType];
         if (cachedBacklog?.length) {
             setScreenData(cachedBacklog, false);
         } else {
             void loadBacklogFromStorage(screenType).then((storedBacklog) => {
-                if (!mounted || !storedBacklog?.length) {
+                // Verse netwerkdata nooit overschrijven met stale storage-data.
+                if (!isMountedRef.current || hasNetworkDataRef.current || !storedBacklog?.length) {
                     return;
                 }
 
-                backlogCache[screenType] = storedBacklog;
                 setScreenData(storedBacklog, false);
             });
         }
 
-        void getBacklog(false);
+        void getBacklog();
 
         return () => {
-            mounted = false;
+            isMountedRef.current = false;
         };
-    }, [screenType]);
-
-    useEffect(() => {
-        const sortFunctions = {
-            [SortProperty.ALPHABETICAL]: sortAlphabetical,
-            [SortProperty.HLTB]: sortByHLTB,
-        };
-
-        const sortFunction = sortFunctions[sortBy];
-        if (sortFunction) {
-            const sortedList: any[] = sortFunction(backlogData, sortAscending);
-            setBacklogData(sortedList);
-        }
-    }, [sortBy, sortAscending]);
+    }, [getBacklog, screenType, setScreenData]);
 
     return (
         <View style={styles.container}>
             <SortButton sortBy={sortBy} sortAscending={sortAscending} setSortBy={setSortBy} setSortAscending={setSortAscending}/>
-            <ButtonGroup items={fullBacklog} setBacklogData={setBacklogData} setSortAscending={setSortAscending} setSortBy={setSortBy} />
+            <ButtonGroup items={fullBacklog} activeFilter={activeFilter} setActiveFilter={setActiveFilter} setSortAscending={setSortAscending} setSortBy={setSortBy} />
             { isLoading ? <LoadingIndicator /> :
                 error ? <Text style={styles.error}>{error}</Text> :
-                <ListItemView listData={backlogData} listType={screenType.toUpperCase()} setListData={setBacklogData} refreshing={refreshing} onRefresh={onRefresh} />
+                <ListItemView listData={backlogData} listType={screenType.toUpperCase()} setListData={updateBacklogItems} refreshing={refreshing} onRefresh={onRefresh} onCompletionChange={onCompletionChange} />
             }
         </View>
     );

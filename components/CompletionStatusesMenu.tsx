@@ -5,22 +5,31 @@ import { Game } from '../types/Game';
 import { CompletionStatusesMenuItem } from './CompletionStatusesMenuItem';
 import { Completion } from '../constants/Completion';
 
-export function CompletionStatusesMenu({ type, item, onClick }: { type: string, item: Game, onClick: any }) {
+export function CompletionStatusesMenu({ type, item, onClick, onCompletionChange }: { type: string, item: Game, onClick: any, onCompletionChange?: (gameId: number, completion: string) => void }) {
+    const completionStatuses = [
+        Completion.NOT_STARTED,
+        Completion.PLAYING,
+        Completion.PAUSED,
+        Completion.DROPPED,
+        Completion.BEATEN,
+        Completion.COMPLETED,
+    ];
+
     return (
         <View style={styles.completionStatusesMenu}>
             <Text style={styles.completionStatusesMenuTitle}>Change completion status</Text>
-            {item.completion !== Completion.NOT_STARTED ?
-                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.NOT_STARTED} /> : null}
-            {item.completion !== Completion.PLAYING ?
-                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.PLAYING} /> : null}
-            {item.completion !== Completion.PAUSED ?
-                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.PAUSED} /> : null}
-            {item.completion !== Completion.DROPPED ?
-                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.DROPPED} /> : null}
-            {item.completion !== Completion.BEATEN ?
-                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.BEATEN} /> : null}
-            {item.completion !== Completion.COMPLETED ?
-                <CompletionStatusesMenuItem type={type} item={item} onClick={onClick} completionStatus={Completion.COMPLETED} /> : null}
+            {completionStatuses
+                .filter((completionStatus) => item.completion !== completionStatus)
+                .map((completionStatus) => (
+                    <CompletionStatusesMenuItem
+                        key={completionStatus}
+                        type={type}
+                        item={item}
+                        onClick={onClick}
+                        onCompletionChange={onCompletionChange}
+                        completionStatus={completionStatus}
+                    />
+                ))}
         </View>
     );
 }

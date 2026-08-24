@@ -31,7 +31,11 @@ const markStorageUnavailable = (error: unknown) => {
 
 const getStorageKey = (screenType: BacklogScreenType): string => `backlog-cache:${screenType}`;
 
-const loadBacklogFromStorage = async (screenType: BacklogScreenType): Promise<Game[] | null> => {
+// Voorkomt dubbele AsyncStorage-reads wanneer meerdere schermen (of de warm-up) tegelijk lezen.
+const pendingLoads = new Map<BacklogScreenType, Promise<Game[] | null>>();
+const memoryCache = new Map<BacklogScreenType, Game[] | null>();
+
+const readBacklogFromStorage = async (screenType: BacklogScreenType): Promise<Game[] | null> => {
     if (storageUnavailable) {
         return null;
     }
@@ -65,7 +69,42 @@ const loadBacklogFromStorage = async (screenType: BacklogScreenType): Promise<Ga
     }
 };
 
+const loadBacklogFromStorage = (screenType: BacklogScreenType): Promise<Game[] | null> => {
+    if (memoryCache.has(screenType)) {
+        return Promise.resolve(memoryCache.get(screenType) ?? null);
+    }
+
+    const pendingLoad = pendingLoads.get(screenType);
+    if (pendingLoad) {
+        return pendingLoad;
+    }
+
+    const load = readBacklogFromStorage(screenType)
+        .then((items) => {
+            memoryCache.set(screenType, items);
+            return items;
+        })
+        .finally(() => {
+            pendingLoads.delete(screenType);
+        });
+
+    pendingLoads.set(screenType, load);
+    return load;
+};
+
+/**
+ * Start het inlezen van de gecachte backlogs al tijdens de app-startup,
+ * zodat het eerste scherm direct data kan tonen.
+ */
+const warmUpBacklogCache = (): void => {
+    (['Backlog', 'RetroBacklog'] as BacklogScreenType[]).forEach((screenType) => {
+        void loadBacklogFromStorage(screenType).catch(() => undefined);
+    });
+};
+
 const saveBacklogToStorage = async (screenType: BacklogScreenType, items: Game[]): Promise<void> => {
+    memoryCache.set(screenType, items);
+
     if (storageUnavailable) {
         return;
     }
@@ -87,6 +126,6 @@ const saveBacklogToStorage = async (screenType: BacklogScreenType, items: Game[]
     }
 };
 
-export { loadBacklogFromStorage, saveBacklogToStorage };
+export { loadBacklogFromStorage, saveBacklogToStorage, warmUpBacklogCache };
 
 
