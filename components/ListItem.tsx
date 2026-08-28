@@ -2,25 +2,37 @@ import * as React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { Text, View } from './Themed';
 import { GameCopyElement } from './GameCopyElement';
+import { CoopElement } from './CoopElement';
 import { CompletionElement } from './CompletionElement';
 import { CompletionStatusesMenu } from './CompletionStatusesMenu';
 import { HLTBElement } from './HLTBElement';
 import { GameImageAndMetacritic } from './GameImageAndMetacritic';
+import { PinElement } from './PinElement';
 import { Game } from '../types/Game';
+import { LIST_ITEM_PADDING } from '../constants/Constants';
 
-const ListItem = React.memo(({ item, type, isOpen, onClick, onCompletionChange }: { item: Game, type: string, isOpen: any, onClick: (id: number) => void, onCompletionChange?: (gameId: number, completion: string) => void }) => {
+const ListItem = React.memo(({ item, type, isOpen, onClick, onCompletionChange, onTogglePin, isPinLimitReached }: { item: Game, type: string, isOpen: any, onClick: (id: number) => void, onCompletionChange?: (gameId: number, completion: string) => void, onTogglePin?: (gameId: number) => void, isPinLimitReached?: boolean }) => {
     const handlePress = React.useCallback(() => onClick(item.id), [onClick, item.id]);
+    const handleTogglePin = React.useCallback(() => onTogglePin?.(item.id), [onTogglePin, item.id]);
 
     return (
         <Pressable onPress={handlePress}>
             <View style={styles.item}>
                 {isOpen ? <View style={styles.menu}><CompletionStatusesMenu type={type} item={item} onClick={handlePress} onCompletionChange={onCompletionChange} /></View> : null}
+                {onTogglePin ? (
+                    <PinElement
+                        isPinned={Boolean(item.isPinned)}
+                        isLimitReached={Boolean(isPinLimitReached)}
+                        onPress={handleTogglePin}
+                    />
+                ) : null}
                 <GameImageAndMetacritic image={item.image} alternativeImage={item.hltbInfo?.game_image} metacriticInfo={item.metacriticInfo} />
                 <View style={styles.line}>
                     <View style={styles.inline}>
                         <CompletionElement completionStatus={item.completion} />
                         <Text style={styles.title}>{item.title}</Text>
                         <GameCopyElement gameCopyType={item.gameCopy} />
+                        <CoopElement multiplayerInfo={item.multiplayerInfo} />
                     </View>
                     { (type === 'BACKLOG' || type === 'RETRO_BACKLOG') && <HLTBElement item={item} /> }
                 </View>
@@ -37,7 +49,7 @@ const styles = StyleSheet.create({
     },
     item: {
         width: 350,
-        padding: 10,
+        padding: LIST_ITEM_PADDING,
         fontSize: 16,
         alignItems: 'center',
         justifyContent: 'center',
@@ -74,6 +86,8 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         maxWidth: 272,
+        // Laat de titel krimpen zodat de co-op- en bezit-iconen altijd passen.
+        flexShrink: 1,
 
     },
 });

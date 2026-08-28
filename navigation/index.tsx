@@ -17,7 +17,6 @@ import NotFoundScreen from '../screens/NotFoundScreen';
 import FullListScreen from '../screens/FullListScreen';
 import { RootStackParamList, RootTabParamList } from '../types';
 import LinkingConfiguration from './LinkingConfiguration';
-import FinishedListScreen from "../screens/FinishedListScreen";
 import RandomSuggestionScreen from '../screens/RandomSuggestionScreen';
 import BaseBacklogScreen from '../screens/BaseBacklogScreen';
 
@@ -85,14 +84,6 @@ function BottomTabNavigator() {
                 options={{
                     title: 'Full list',
                     tabBarIcon: ({ color }) => <FontAwesome5 name="list" color={color} size={25} />,
-                }}
-            />
-            <BottomTab.Screen
-                name="Finished"
-                component={FinishedListScreen}
-                options={{
-                    title: 'Finished',
-                    tabBarIcon: ({ color }) => <FontAwesome5 name="flag-checkered" color={color} size={25} />,
                 }}
             />
             <BottomTab.Screen

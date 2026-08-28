@@ -5,6 +5,7 @@ import { View } from './Themed';
 import { MetacriticInfo } from '../types/MetacriticInfo';
 import { MetacriticElement } from './MetacriticElement';
 import { getGameImageUri } from '../utilities/Utilities';
+import { GAME_IMAGE_HEIGHT, GAME_IMAGE_PADDING_HORIZONTAL, GAME_IMAGE_WIDTH } from '../constants/Constants';
 
 export function GameImageAndMetacritic({ image, alternativeImage, metacriticInfo }: Readonly<{
     image: string, alternativeImage: string | undefined, metacriticInfo: MetacriticInfo | undefined
@@ -33,11 +34,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'flex-start',
         alignItems: 'flex-start',
-        paddingLeft: 39,
-        paddingRight: 39,
+        paddingLeft: GAME_IMAGE_PADDING_HORIZONTAL,
+        paddingRight: GAME_IMAGE_PADDING_HORIZONTAL,
     },
     image: {
-        width: 272,
-        height: 153,
+        width: GAME_IMAGE_WIDTH,
+        height: GAME_IMAGE_HEIGHT,
     }
 });

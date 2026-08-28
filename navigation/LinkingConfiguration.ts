@@ -20,11 +20,6 @@ const linking: LinkingOptions<RootStackParamList> = {
                             BaseBacklogScreen: 'Backlog',
                         },
                     },
-                    Finished: {
-                        screens: {
-                            FullListScreen: 'Finished',
-                        },
-                    },
                     FullList: {
                         screens: {
                             FullListScreen: 'Full list',

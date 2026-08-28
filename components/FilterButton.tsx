@@ -5,7 +5,15 @@ import { FontAwesome5 } from '@expo/vector-icons';
 export function FilterButton({ filterFunction, iconName, text, numberOfItems, isActive }: { filterFunction: any, iconName?: any, text?: any, numberOfItems: number, isActive?: boolean }) {
     return (
         <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, isActive ? styles.activeButton : null]} onPress={filterFunction}>
-            {iconName && <FontAwesome5 name={iconName} size={20} color="red" style={{ paddingRight: 5 }} />}
+            {iconName && (
+                <FontAwesome5
+                    name={iconName}
+                    size={20}
+                    // Bij een actieve (volledig rode) knop is een zwart icoon beter leesbaar.
+                    color={isActive ? 'black' : 'red'}
+                    style={{ paddingRight: 5 }}
+                />
+            )}
             <Text style={styles.buttonText}>{text}[{numberOfItems}]</Text>
         </Pressable>
     );
@@ -26,7 +34,7 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     activeButton: {
-        backgroundColor: 'rgba(255, 0, 0, 0.2)',
+        backgroundColor: 'red',
     },
     buttonText: {
         color: '#ffffff',

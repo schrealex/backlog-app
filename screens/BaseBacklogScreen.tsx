@@ -1,21 +1,22 @@
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Alert, StyleSheet, Text } from 'react-native';
 import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { View } from '../components/Themed';
 import { Game } from '../types/Game';
 import { RootTabScreenProps } from '../types';
 import { SortProperty } from '../constants/SortProperty';
 import { Completion } from '../constants/Completion';
-import { GameFilter, applyGameFilter } from '../constants/GameFilter';
+import { GameFilter, ActiveFilters, FilterGroup, applyGameFilters } from '../constants/GameFilter';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { ListItemView } from '../components/ListItemView';
 import ButtonGroup from '../components/ButtonGroup';
-import SortButton from '../components/SortButton';
-import { GAME_INFORMATION_BASE_URL } from '../constants/Constants';
-import { mergeGameInformation, sortAlphabetical, sortByHLTB } from '../utilities/Utilities';
+import SortMenu from '../components/SortMenu';
+import { GAME_INFORMATION_BASE_URL, MAX_PINNED_GAMES } from '../constants/Constants';
+import { countPinnedGames, mergeGameInformation, sortAlphabetical, sortByHLTB, sortPinnedFirst, togglePinnedGame } from '../utilities/Utilities';
 import { firestore } from '../firebaseConfig';
 import { loadBacklogFromStorage, saveBacklogToStorage } from '../services/BacklogCacheService';
+import { updateGameFields } from '../services/GameUpdateService';
 
 type BacklogScreenType = 'Backlog' | 'RetroBacklog';
 
@@ -33,9 +34,16 @@ const collectionConfigByScreenType: Record<BacklogScreenType, { name: string, co
     },
 };
 
-const defaultFilterByScreenType: Record<BacklogScreenType, GameFilter> = {
-    Backlog: GameFilter.PLAYING,
-    RetroBacklog: GameFilter.ALL,
+const defaultFilterByScreenType: Record<BacklogScreenType, ActiveFilters> = {
+    Backlog: { completion: GameFilter.PLAYING },
+    RetroBacklog: {},
+};
+
+// `screenType.toUpperCase()` leverde 'RETROBACKLOG' op, waardoor de retro-tab
+// geen HLTB-info toonde en statuswijzigingen niet naar Firestore geschreven werden.
+const listTypeByScreenType: Record<BacklogScreenType, string> = {
+    Backlog: 'BACKLOG',
+    RetroBacklog: 'RETRO_BACKLOG',
 };
 
 const sortFunctions = {
@@ -43,13 +51,20 @@ const sortFunctions = {
     [SortProperty.HLTB]: sortByHLTB,
 };
 
-const ENRICHMENT_TIMEOUT_MS = 25000;
+// De verrijking draait volledig op de achtergrond en blokkeert de UI niet, dus mag hij
+// lang duren. Een koude respons kost ~45s; met een krappe timeout werd die afgebroken
+// en verscheen de HLTB-data pas na een handmatige refresh.
+const ENRICHMENT_TIMEOUT_MS = 90000;
+const ENRICHMENT_RETRY_ATTEMPTS = 1;
+const ENRICHMENT_RETRY_DELAY_MS = 2000;
+
+const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Backlog' | 'RetroBacklog'> & { screenType: BacklogScreenType }) {
 
     const [isLoading, setIsLoading] = useState(true);
     const [fullBacklog, setFullBacklog] = useState<Game[]>([]);
-    const [activeFilter, setActiveFilter] = useState<GameFilter>(defaultFilterByScreenType[screenType]);
+    const [activeFilters, setActiveFilters] = useState<ActiveFilters>(defaultFilterByScreenType[screenType]);
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
     const [refreshing, setRefreshing] = useState(false);
@@ -59,13 +74,40 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
     const hasNetworkDataRef = useRef(false);
     const latestBacklogRef = useRef<Game[]>([]);
 
+    // Pinnen hoort bij de ongefilterde weergave van de backlog: daar bepaal je zelf
+    // welke games bovenaan moeten blijven staan.
+    const isPinningEnabled = screenType === 'Backlog' && Object.keys(activeFilters).length === 0;
+
     // De zichtbare lijst is afgeleide state: filter + sortering worden altijd opnieuw
     // toegepast wanneer de onderliggende games wijzigen (bijv. na een statuswijziging).
     const backlogData = useMemo(() => {
-        const filteredGames = applyGameFilter(fullBacklog, activeFilter);
+        const filteredGames = applyGameFilters(fullBacklog, activeFilters);
         const sortFunction = sortFunctions[sortBy];
-        return sortFunction ? sortFunction(filteredGames, sortAscending) : filteredGames;
-    }, [fullBacklog, activeFilter, sortBy, sortAscending]);
+        const sortedGames = sortFunction ? sortFunction(filteredGames, sortAscending) : filteredGames;
+
+        return isPinningEnabled ? sortPinnedFirst(sortedGames) : sortedGames;
+    }, [fullBacklog, activeFilters, sortBy, sortAscending, isPinningEnabled]);
+
+    const setFilter = useCallback((group: FilterGroup, filter?: GameFilter) => {
+        setActiveFilters((currentFilters) => {
+            const nextFilters = { ...currentFilters };
+
+            if (filter) {
+                nextFilters[group] = filter;
+            } else {
+                delete nextFilters[group];
+            }
+
+            return nextFilters;
+        });
+    }, []);
+
+    const clearAllFilters = useCallback(() => setActiveFilters({}), []);
+
+    const isPinLimitReached = useMemo(
+        () => countPinnedGames(fullBacklog) >= MAX_PINNED_GAMES,
+        [fullBacklog]
+    );
 
     const setScreenData = useCallback((games: Game[], shouldPersist = true) => {
         if (!isMountedRef.current) {
@@ -97,6 +139,41 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
         }), true);
     }, [updateBacklogItems]);
 
+    const onTogglePin = useCallback((gameId: number) => {
+        const { games, isPinned, hasChanges, limitReached } = togglePinnedGame(
+            latestBacklogRef.current,
+            gameId,
+            MAX_PINNED_GAMES
+        );
+
+        if (limitReached) {
+            Alert.alert(
+                `Maximum of ${MAX_PINNED_GAMES} pinned games`,
+                `You can pin up to ${MAX_PINNED_GAMES} games to the top. Unpin one first.`
+            );
+            return;
+        }
+
+        if (!hasChanges) {
+            return;
+        }
+
+        const changedGame = games.find((game) => game.id === gameId);
+        setScreenData(games, true);
+
+        void updateGameFields(listTypeByScreenType[screenType], changedGame?.documentId, { isPinned }).then((isUpdated) => {
+            if (isUpdated || !isMountedRef.current) {
+                return;
+            }
+
+            // Firestore-update mislukt: lokale wijziging terugdraaien.
+            const revertedGames = latestBacklogRef.current.map((game) => (
+                game.id === gameId ? { ...game, isPinned: !isPinned } : game
+            ));
+            setScreenData(revertedGames, true);
+        });
+    }, [screenType, setScreenData]);
+
     const getBacklogCoreData = useCallback(async (): Promise<Game[]> => {
         const { name, completionStatuses } = collectionConfigByScreenType[screenType];
         const backlogCollection = collection(firestore, name);
@@ -115,7 +192,7 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
         });
     }, [screenType]);
 
-    const getFullBacklogWithInformation = useCallback(async (): Promise<Game[]> => {
+    const fetchBacklogWithInformation = useCallback(async (): Promise<Game[]> => {
         const url = `${GAME_INFORMATION_BASE_URL}game-information?type=${screenType}`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), ENRICHMENT_TIMEOUT_MS);
@@ -123,17 +200,39 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
         try {
             const response = await fetch(url, { signal: controller.signal });
             if (!response.ok) {
-                console.error({ call: 'getFullBacklogWithInformation response not OK', status: response.status, url, timestamp: new Date().toISOString() });
+                console.error({ call: 'fetchBacklogWithInformation response not OK', status: response.status, url, timestamp: new Date().toISOString() });
                 throw new Error('Response returned with not OK.');
             }
             return await response.json();
-        } catch (fetchError) {
-            console.error({ call: 'getFullBacklogWithInformation', error: fetchError, url, timestamp: new Date().toISOString() });
-            throw new Error('An error occurred while fetching the backlog.');
         } finally {
             clearTimeout(timeoutId);
         }
     }, [screenType]);
+
+    const getFullBacklogWithInformation = useCallback(async (): Promise<Game[]> => {
+        let lastError: unknown;
+
+        for (let attempt = 0; attempt <= ENRICHMENT_RETRY_ATTEMPTS; attempt += 1) {
+            if (attempt > 0) {
+                // Een mislukte eerste poging heeft de server meestal al opgewarmd,
+                // waardoor een tweede poging vrijwel altijd snel slaagt.
+                await delay(ENRICHMENT_RETRY_DELAY_MS);
+
+                if (!isMountedRef.current) {
+                    throw new Error('Screen is no longer mounted.');
+                }
+            }
+
+            try {
+                return await fetchBacklogWithInformation();
+            } catch (fetchError) {
+                lastError = fetchError;
+                console.error({ call: 'getFullBacklogWithInformation', attempt, error: fetchError, screenType, timestamp: new Date().toISOString() });
+            }
+        }
+
+        throw lastError instanceof Error ? lastError : new Error('An error occurred while fetching the backlog.');
+    }, [fetchBacklogWithInformation, screenType]);
 
     const getBacklog = useCallback(async () => {
         setError(null);
@@ -214,11 +313,20 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
 
     return (
         <View style={styles.container}>
-            <SortButton sortBy={sortBy} sortAscending={sortAscending} setSortBy={setSortBy} setSortAscending={setSortAscending}/>
-            <ButtonGroup items={fullBacklog} activeFilter={activeFilter} setActiveFilter={setActiveFilter} setSortAscending={setSortAscending} setSortBy={setSortBy} />
+            <SortMenu sortBy={sortBy} sortAscending={sortAscending} setSortBy={setSortBy} setSortAscending={setSortAscending}/>
+            <ButtonGroup items={fullBacklog} activeFilters={activeFilters} setFilter={setFilter} clearAllFilters={clearAllFilters} />
             { isLoading ? <LoadingIndicator /> :
                 error ? <Text style={styles.error}>{error}</Text> :
-                <ListItemView listData={backlogData} listType={screenType.toUpperCase()} setListData={updateBacklogItems} refreshing={refreshing} onRefresh={onRefresh} onCompletionChange={onCompletionChange} />
+                <ListItemView
+                    listData={backlogData}
+                    listType={listTypeByScreenType[screenType]}
+                    setListData={updateBacklogItems}
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    onCompletionChange={onCompletionChange}
+                    onTogglePin={isPinningEnabled ? onTogglePin : undefined}
+                    isPinLimitReached={isPinLimitReached}
+                />
             }
         </View>
     );

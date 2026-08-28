@@ -6,32 +6,28 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { collection, getDocs } from 'firebase/firestore/lite';
 import { firestore } from '../firebaseConfig';
 import { SortProperty } from '../constants/SortProperty';
-import { GameFilter, applyGameFilter } from '../constants/GameFilter';
+import { ActiveFilters, FilterGroup, GameFilter, applyGameFilters, filterGroups, filterMetadata } from '../constants/GameFilter';
 import { Game } from '../types/Game';
-import SortButton from '../components/SortButton';
+import SortMenu from '../components/SortMenu';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { FilterButton } from '../components/FilterButton';
+import FilterMenu, { FilterMenuGroup } from '../components/FilterMenu';
 import { ListItemView } from '../components/ListItemView';
 import { sortAlphabetical } from '../utilities/Utilities';
 
-const copyFilters: Array<{ filter: GameFilter, icon?: string, text?: string, icons?: string[] }> = [
-    { filter: GameFilter.ALL, text: 'All ' },
-    { filter: GameFilter.PHYSICAL, icon: 'sd-card' },
-    { filter: GameFilter.DIGITAL, icon: 'cloud-download-alt' },
-    { filter: GameFilter.BOTH, icons: ['sd-card', 'cloud-download-alt'] },
-];
+// Bezit gebruik je het vaakst en blijft daarom als knoppenrij zichtbaar.
+const copyFilters = filterGroups.copy;
 
-const completionFilters: Array<{ filter: GameFilter, icon: string }> = [
-    { filter: GameFilter.CONTINUOUS, icon: 'recycle' },
-    { filter: GameFilter.DROPPED, icon: 'times' },
-    { filter: GameFilter.BEATEN, icon: 'fist-raised' },
-    { filter: GameFilter.COMPLETED, icon: 'trophy' },
+// Status en samen spelen zitten achter het filtermenu; dat scheelt twee rijen knoppen.
+const menuGroups: FilterMenuGroup[] = [
+    { group: 'completion', title: 'Status', filters: filterGroups.completion },
+    { group: 'multiplayer', title: 'Samen spelen', filters: filterGroups.multiplayer },
 ];
 
 export default function FullListScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [fullList, setFullList] = useState<Game[]>([]);
-    const [activeFilter, setActiveFilter] = useState<GameFilter>(GameFilter.ALL);
+    const [activeFilters, setActiveFilters] = useState<ActiveFilters>({});
     const [sortAscending, setSortAscending] = useState(true);
     const [sortBy, setSortBy] = useState(SortProperty.ALPHABETICAL);
     const [refreshing, setRefreshing] = useState(false);
@@ -41,16 +37,34 @@ export default function FullListScreen() {
 
     // Afgeleide lijst: blijft automatisch in sync als een completion-status wijzigt.
     const fullListData = useMemo(
-        () => sortAlphabetical(applyGameFilter(fullList, activeFilter), sortAscending),
-        [fullList, activeFilter, sortAscending]
+        () => sortAlphabetical(applyGameFilters(fullList, activeFilters), sortAscending),
+        [fullList, activeFilters, sortAscending]
     );
 
-    const counts = useMemo(() => {
-        return [...copyFilters, ...completionFilters].reduce((accumulator, { filter }) => {
-            accumulator[filter] = applyGameFilter(fullList, filter).length;
-            return accumulator;
-        }, {} as Record<string, number>);
-    }, [fullList]);
+    /**
+     * Tellingen zijn contextueel: ze laten zien hoeveel games je overhoudt als je
+     * dit filter toevoegt aan je huidige selectie. Zonder dat kun je jezelf in een
+     * lege lijst klikken.
+     */
+    const getCount = useCallback((group: FilterGroup, filter: GameFilter) => (
+        applyGameFilters(fullList, { ...activeFilters, [group]: filter }).length
+    ), [fullList, activeFilters]);
+
+    const setFilter = useCallback((group: FilterGroup, filter?: GameFilter) => {
+        setActiveFilters((currentFilters) => {
+            const nextFilters = { ...currentFilters };
+
+            if (filter) {
+                nextFilters[group] = filter;
+            } else {
+                delete nextFilters[group];
+            }
+
+            return nextFilters;
+        });
+    }, []);
+
+    const clearAllFilters = useCallback(() => setActiveFilters({}), []);
 
     const setGames = useCallback((games: Game[]) => {
         fullListRef.current = games;
@@ -110,47 +124,56 @@ export default function FullListScreen() {
         void getFullListOfGames().finally(() => setRefreshing(false));
     }, [getFullListOfGames]);
 
-    const selectFilter = (filter: GameFilter) => {
-        setActiveFilter(filter);
-        setSortBy(SortProperty.ALPHABETICAL);
-        setSortAscending(true);
-    };
+    const selectCopyFilter = (filter?: GameFilter) => setFilter('copy', filter);
 
     return (
         <View style={styles.container}>
-            <SortButton sortBy={SortProperty.ALPHABETICAL} sortAscending={sortAscending} setSortBy={setSortBy} setSortAscending={setSortAscending} />
+            {/* Dit scherm sorteert alleen alfabetisch, dus tonen we geen keuzemenu. */}
+            <SortMenu
+                sortBy={SortProperty.ALPHABETICAL}
+                sortAscending={sortAscending}
+                setSortBy={setSortBy}
+                setSortAscending={setSortAscending}
+                sortProperties={[SortProperty.ALPHABETICAL]}
+            />
             <View style={styles.buttonGroup}>
-                {copyFilters.map(({ filter, icon, text, icons }) => (
-                    icons ? (
-                        <Pressable key={filter} style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, activeFilter === filter ? styles.activeButton : null]} onPress={() => selectFilter(filter)}>
+                <FilterButton
+                    filterFunction={() => selectCopyFilter(undefined)}
+                    text={filterMetadata[GameFilter.ALL].label + ' '}
+                    numberOfItems={applyGameFilters(fullList, { ...activeFilters, copy: undefined }).length}
+                    isActive={!activeFilters.copy}
+                />
+                {copyFilters.map((filter) => {
+                    const { icon, icons } = filterMetadata[filter];
+                    const isActive = activeFilters.copy === filter;
+                    // Nogmaals tikken op het actieve filter wist het.
+                    const onPress = () => selectCopyFilter(isActive ? undefined : filter);
+
+                    return icons ? (
+                        <Pressable key={filter} style={({ pressed }) => [{ opacity: pressed ? 0.4 : 1 }, styles.button, isActive ? styles.activeButton : null]} onPress={onPress}>
                             {icons.map((iconName) => (
-                                <FontAwesome5 key={iconName} name={iconName} size={20} color="red" style={{ paddingRight: 5 }} />
+                                <FontAwesome5 key={iconName} name={iconName} size={20} color={isActive ? 'black' : 'red'} style={{ paddingRight: 5 }} />
                             ))}
-                            <Text style={styles.buttonText}>[{counts[filter] ?? 0}]</Text>
+                            <Text style={styles.buttonText}>[{getCount('copy', filter)}]</Text>
                         </Pressable>
                     ) : (
                         <FilterButton
                             key={filter}
-                            filterFunction={() => selectFilter(filter)}
+                            filterFunction={onPress}
                             iconName={icon}
-                            text={text}
-                            numberOfItems={counts[filter] ?? 0}
-                            isActive={activeFilter === filter}
+                            numberOfItems={getCount('copy', filter)}
+                            isActive={isActive}
                         />
-                    )
-                ))}
+                    );
+                })}
             </View>
-            <View style={styles.buttonGroup}>
-                {completionFilters.map(({ filter, icon }) => (
-                    <FilterButton
-                        key={filter}
-                        filterFunction={() => selectFilter(filter)}
-                        iconName={icon}
-                        numberOfItems={counts[filter] ?? 0}
-                        isActive={activeFilter === filter}
-                    />
-                ))}
-            </View>
+            <FilterMenu
+                groups={menuGroups}
+                activeFilters={activeFilters}
+                onChange={setFilter}
+                onClearAll={clearAllFilters}
+                getCount={getCount}
+            />
             { isLoading ?
                 <LoadingIndicator /> :
                 <ListItemView listData={fullListData} listType={'FULL_LIST'} setListData={updateGames} refreshing={refreshing} onRefresh={onRefresh} onCompletionChange={onCompletionChange} />
@@ -184,7 +207,7 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     activeButton: {
-        backgroundColor: 'rgba(255, 0, 0, 0.2)',
+        backgroundColor: 'red',
     },
     buttonText: {
         color: '#ffffff',

@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { StyleSheet, TouchableHighlight } from 'react-native';
-import { doc, updateDoc } from 'firebase/firestore/lite';
-import { firestore } from '../firebaseConfig';
 import { Text } from './Themed';
 import { useState } from 'react';
+import { updateGameFields } from '../services/GameUpdateService';
 
 export function CompletionStatusesMenuItem({ type, item, completionStatus, onClick, onCompletionChange }: { type: string, item: any, completionStatus: string, onClick: any, onCompletionChange?: (gameId: number, completion: string) => void }) {
 
@@ -11,7 +10,7 @@ export function CompletionStatusesMenuItem({ type, item, completionStatus, onCli
 
 
     const changeStatus = (status: string): void => {
-        void updateFirebaseDocumentWithStatus(status);
+        void updateGameFields(type, item.documentId, { completion: status });
 
         if (onCompletionChange) {
             // De lijst wordt via de state bijgewerkt; dat sluit ook het menu.
@@ -21,23 +20,6 @@ export function CompletionStatusesMenuItem({ type, item, completionStatus, onCli
 
         item.completion = status;
         onClick();
-    };
-
-    const updateFirebaseDocumentWithStatus = async (status: string) => {
-        const path = (type === 'BACKLOG' || type === 'FULL_LIST') ? 'full-games-list' : type === 'RETRO_BACKLOG' ? 'retro-backlog' : '';
-        if (!path || !item.documentId) {
-            console.error({ call: 'updateFirebaseDocumentWithStatus', message: 'Missing path or documentId', path, documentId: item.documentId, timestamp: new Date().toISOString() });
-            return;
-        }
-
-        const documentReference = doc(firestore, path, item.documentId);
-        updateDoc(documentReference, {
-            completion: status
-        })
-        .then()
-        .catch(error => {
-            console.error({ call: 'updateFirebaseDocumentWithStatus', error, timestamp: new Date().toISOString() });
-        });
     };
 
     const touchProperties = {

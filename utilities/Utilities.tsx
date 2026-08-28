@@ -55,10 +55,10 @@ const getImagePrefetchUris = (games: any[], limit = 12) => {
 /**
  * Voegt aanvullende (trage) game-informatie toe aan een bestaande lijst zonder de lijst te vervangen.
  * Behoudt object-identiteit van ongewijzigde items zodat React.memo re-renders kan overslaan.
- * `completion` en `isMenuOpen` van de bestaande lijst blijven leidend: die kunnen door de
- * gebruiker gewijzigd zijn terwijl de trage verrijking nog onderweg was.
+ * `completion`, `isMenuOpen` en `isPinned` van de bestaande lijst blijven leidend: die kunnen door
+ * de gebruiker gewijzigd zijn terwijl de trage verrijking nog onderweg was.
  */
-const PRESERVED_KEYS = ['completion', 'isMenuOpen'];
+const PRESERVED_KEYS = ['completion', 'isMenuOpen', 'isPinned'];
 
 const mergeGameInformation = <T extends { id: number }>(base: T[], additional: T[]): { games: T[], hasChanges: boolean } => {
     if (!base?.length) {
@@ -105,4 +105,52 @@ const mergeGameInformation = <T extends { id: number }>(base: T[], additional: T
     return { games: hasChanges ? merged : base, hasChanges };
 };
 
-export { filterCharacters, sortAlphabetical, sortByHLTB, getGameImageUri, getImagePrefetchUris, mergeGameInformation }
+const countPinnedGames = <T extends { isPinned?: boolean }>(games: T[]): number => {
+    return games.reduce((total, game) => (game.isPinned ? total + 1 : total), 0);
+};
+
+/**
+ * Zet gepinde games bovenaan met behoud van de bestaande (gesorteerde) volgorde.
+ * Zonder gepinde games wordt dezelfde array-referentie teruggegeven, zodat
+ * onnodige re-renders uitblijven.
+ */
+const sortPinnedFirst = <T extends { isPinned?: boolean }>(games: T[]): T[] => {
+    const pinnedGames = games.filter((game) => game.isPinned);
+    if (!pinnedGames.length || pinnedGames.length === games.length) {
+        return games;
+    }
+
+    return [...pinnedGames, ...games.filter((game) => !game.isPinned)];
+};
+
+/**
+ * Zet de pin-status van één game om, met respect voor het maximum.
+ * Bij het overschrijden van het maximum blijft de lijst ongewijzigd en wordt
+ * `limitReached` teruggegeven zodat de UI daarop kan reageren.
+ */
+const togglePinnedGame = <T extends { id: number, isPinned?: boolean }>(games: T[], gameId: number, maxPinnedGames: number): {
+    games: T[],
+    isPinned: boolean,
+    hasChanges: boolean,
+    limitReached: boolean,
+} => {
+    const targetGame = games.find((game) => game.id === gameId);
+    if (!targetGame) {
+        return { games, isPinned: false, hasChanges: false, limitReached: false };
+    }
+
+    const nextIsPinned = !targetGame.isPinned;
+
+    if (nextIsPinned && countPinnedGames(games) >= maxPinnedGames) {
+        return { games, isPinned: Boolean(targetGame.isPinned), hasChanges: false, limitReached: true };
+    }
+
+    return {
+        games: games.map((game) => (game.id === gameId ? { ...game, isPinned: nextIsPinned } : game)),
+        isPinned: nextIsPinned,
+        hasChanges: true,
+        limitReached: false,
+    };
+};
+
+export { filterCharacters, sortAlphabetical, sortByHLTB, getGameImageUri, getImagePrefetchUris, mergeGameInformation, countPinnedGames, sortPinnedFirst, togglePinnedGame }

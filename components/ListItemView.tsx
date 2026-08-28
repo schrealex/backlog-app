@@ -5,7 +5,7 @@ import ListItem from './ListItem';
 import { Game } from '../types/Game';
 import { getImagePrefetchUris } from '../utilities/Utilities';
 
-export function ListItemView({ listData, setListData, listType, refreshing, onRefresh, onCompletionChange }: { listData: any, setListData: any, listType: string, refreshing: boolean, onRefresh: any, onCompletionChange?: (gameId: number, completion: string) => void }) {
+export function ListItemView({ listData, setListData, listType, refreshing, onRefresh, onCompletionChange, onTogglePin, isPinLimitReached }: { listData: any, setListData: any, listType: string, refreshing: boolean, onRefresh: any, onCompletionChange?: (gameId: number, completion: string) => void, onTogglePin?: (gameId: number) => void, isPinLimitReached?: boolean }) {
 
     const prefetchedUrisRef = React.useRef<Set<string>>(new Set());
 
@@ -37,8 +37,16 @@ export function ListItemView({ listData, setListData, listType, refreshing, onRe
     }, [setListData]);
 
     const renderItem = React.useCallback(({ item }: { item: Game }) => (
-        <ListItem item={item} type={listType} isOpen={item.isMenuOpen} onClick={onClick} onCompletionChange={onCompletionChange} />
-    ), [listType, onClick, onCompletionChange]);
+        <ListItem
+            item={item}
+            type={listType}
+            isOpen={item.isMenuOpen}
+            onClick={onClick}
+            onCompletionChange={onCompletionChange}
+            onTogglePin={onTogglePin}
+            isPinLimitReached={isPinLimitReached}
+        />
+    ), [listType, onClick, onCompletionChange, onTogglePin, isPinLimitReached]);
 
     const keyExtractor = React.useCallback((item: Game) => item.id.toString(), []);
 

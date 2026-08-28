@@ -3,45 +3,54 @@ import { StyleSheet } from 'react-native';
 import { View } from './Themed';
 import { FilterButton } from './FilterButton';
 import { Game } from '../types/Game';
-import { GameFilter, applyGameFilter } from '../constants/GameFilter';
-import { SortProperty } from '../constants/SortProperty';
+import { ActiveFilters, FilterGroup, GameFilter, applyGameFilters, filterMetadata } from '../constants/GameFilter';
 
-const buttonDefinitions: Array<{ filter: GameFilter, icon?: string, text?: string }> = [
-    { filter: GameFilter.ALL, text: 'All ' },
-    { filter: GameFilter.PHYSICAL, icon: 'sd-card' },
-    { filter: GameFilter.DIGITAL, icon: 'cloud-download-alt' },
-    { filter: GameFilter.PLAYING, icon: 'gamepad' },
-    { filter: GameFilter.PAUSED, icon: 'pause' },
+// Bezit en status zijn losse groepen, dus 'Physical' en 'Playing' zijn combineerbaar.
+const groupedFilters: Array<{ group: FilterGroup, filter: GameFilter }> = [
+    { group: 'copy', filter: GameFilter.PHYSICAL },
+    { group: 'copy', filter: GameFilter.DIGITAL },
+    { group: 'completion', filter: GameFilter.PLAYING },
+    { group: 'completion', filter: GameFilter.PAUSED },
 ];
 
-const ButtonGroup = ({ items, activeFilter, setActiveFilter, setSortAscending, setSortBy } : { items: Game[], activeFilter: GameFilter, setActiveFilter: (filter: GameFilter) => void, setSortAscending: any, setSortBy: any }) => {
+const ButtonGroup = ({ items, activeFilters, setFilter, clearAllFilters }: {
+    items: Game[],
+    activeFilters: ActiveFilters,
+    setFilter: (group: FilterGroup, filter?: GameFilter) => void,
+    clearAllFilters: () => void,
+}) => {
 
-    const counts = React.useMemo(() => {
-        const sourceItems = (items ?? []) as Game[];
-        return buttonDefinitions.reduce((accumulator, { filter }) => {
-            accumulator[filter] = applyGameFilter(sourceItems, filter).length;
-            return accumulator;
-        }, {} as Record<string, number>);
-    }, [items]);
+    const sourceItems = React.useMemo(() => (items ?? []) as Game[], [items]);
 
-    const selectFilter = (filter: GameFilter) => {
-        setActiveFilter(filter);
-        setSortAscending(true);
-        setSortBy(SortProperty.ALPHABETICAL);
-    };
+    // Contextuele telling: hoeveel games hou je over als je dit filter toevoegt?
+    const getCount = React.useCallback((group: FilterGroup, filter: GameFilter) => (
+        applyGameFilters(sourceItems, { ...activeFilters, [group]: filter }).length
+    ), [sourceItems, activeFilters]);
+
+    const hasActiveFilters = Object.keys(activeFilters).length > 0;
 
     return (
         <View style={styles.buttonGroup}>
-            {buttonDefinitions.map(({ filter, icon, text }) => (
-                <FilterButton
-                    key={filter}
-                    filterFunction={() => selectFilter(filter)}
-                    iconName={icon}
-                    text={text}
-                    numberOfItems={counts[filter] ?? 0}
-                    isActive={activeFilter === filter}
-                />
-            ))}
+            <FilterButton
+                filterFunction={clearAllFilters}
+                text={filterMetadata[GameFilter.ALL].label + ' '}
+                numberOfItems={sourceItems.length}
+                isActive={!hasActiveFilters}
+            />
+            {groupedFilters.map(({ group, filter }) => {
+                const isActive = activeFilters[group] === filter;
+
+                return (
+                    <FilterButton
+                        key={filter}
+                        // Nogmaals tikken op het actieve filter wist het.
+                        filterFunction={() => setFilter(group, isActive ? undefined : filter)}
+                        iconName={filterMetadata[filter].icon}
+                        numberOfItems={getCount(group, filter)}
+                        isActive={isActive}
+                    />
+                );
+            })}
         </View>
     );
 };
