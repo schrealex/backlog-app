@@ -43,7 +43,8 @@
           "image": "./assets/images/splash.png",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "./plugins/withDisableJitpack.js"
     ]
   }
 }
