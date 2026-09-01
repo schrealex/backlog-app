@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text } from 'react-native';
-import { collection, getDocs, query, where } from 'firebase/firestore/lite';
+import { where } from 'firebase/firestore/lite';
 import { View } from '../components/Themed';
 import { Game } from '../types/Game';
 import { RootTabScreenProps } from '../types';
@@ -14,24 +14,18 @@ import ButtonGroup from '../components/ButtonGroup';
 import SortMenu from '../components/SortMenu';
 import { GAME_INFORMATION_BASE_URL, MAX_PINNED_GAMES } from '../constants/Constants';
 import { countPinnedGames, mergeGameInformation, sortAlphabetical, sortByHLTB, sortPinnedFirst, togglePinnedGame } from '../utilities/Utilities';
-import { firestore } from '../firebaseConfig';
 import { loadBacklogFromStorage, saveBacklogToStorage } from '../services/BacklogCacheService';
 import { updateGameFields } from '../services/GameUpdateService';
+import { getLibraryEntries } from '../services/LibraryService';
 
 type BacklogScreenType = 'Backlog' | 'RetroBacklog';
 
 const backlogCache: Partial<Record<BacklogScreenType, Game[]>> = {};
 
-// De 'backlog'-collectie bestaat niet meer; de backlog is de niet-afgeronde selectie
-// uit 'full-games-list'. Dit levert dezelfde set als het (trage) game-information endpoint.
-const collectionConfigByScreenType: Record<BacklogScreenType, { name: string, completionStatuses?: string[] }> = {
-    Backlog: {
-        name: 'full-games-list',
-        completionStatuses: [Completion.NOT_STARTED, Completion.PLAYING, Completion.PAUSED],
-    },
-    RetroBacklog: {
-        name: 'retro-backlog',
-    },
+// Alleen de Backlog-lijst filtert op actieve completion-statussen; de retro-backlog
+// toont altijd alle games in die lijst.
+const completionStatusesByScreenType: Partial<Record<BacklogScreenType, string[]>> = {
+    Backlog: [Completion.NOT_STARTED, Completion.PLAYING, Completion.PAUSED],
 };
 
 const defaultFilterByScreenType: Record<BacklogScreenType, ActiveFilters> = {
@@ -161,7 +155,7 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
         const changedGame = games.find((game) => game.id === gameId);
         setScreenData(games, true);
 
-        void updateGameFields(listTypeByScreenType[screenType], changedGame?.documentId, { isPinned }).then((isUpdated) => {
+        void updateGameFields(changedGame?.documentId, { isPinned }).then((isUpdated) => {
             if (isUpdated || !isMountedRef.current) {
                 return;
             }
@@ -175,21 +169,15 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
     }, [screenType, setScreenData]);
 
     const getBacklogCoreData = useCallback(async (): Promise<Game[]> => {
-        const { name, completionStatuses } = collectionConfigByScreenType[screenType];
-        const backlogCollection = collection(firestore, name);
-        const backlogQuery = completionStatuses
-            ? query(backlogCollection, where('completion', 'in', completionStatuses))
-            : backlogCollection;
-        const snapshot = await getDocs(backlogQuery);
+        const list = listTypeByScreenType[screenType];
+        const completionStatuses = completionStatusesByScreenType[screenType];
+        const constraints = [where('list', '==', list)];
 
-        return snapshot.docs.map((doc) => {
-            const data = doc.data() as Partial<Game>;
-            return {
-                ...data,
-                documentId: doc.id,
-                isMenuOpen: false,
-            } as Game;
-        });
+        if (completionStatuses) {
+            constraints.push(where('completion', 'in', completionStatuses));
+        }
+
+        return getLibraryEntries(...constraints);
     }, [screenType]);
 
     const fetchBacklogWithInformation = useCallback(async (): Promise<Game[]> => {

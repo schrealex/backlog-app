@@ -18,7 +18,7 @@ const ListItem = React.memo(({ item, type, isOpen, onClick, onCompletionChange, 
     return (
         <Pressable onPress={handlePress}>
             <View style={styles.item}>
-                {isOpen ? <View style={styles.menu}><CompletionStatusesMenu type={type} item={item} onClick={handlePress} onCompletionChange={onCompletionChange} /></View> : null}
+                {isOpen ? <View style={styles.menu}><CompletionStatusesMenu item={item} onClick={handlePress} onCompletionChange={onCompletionChange} /></View> : null}
                 {onTogglePin ? (
                     <PinElement
                         isPinned={Boolean(item.isPinned)}

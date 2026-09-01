@@ -5,7 +5,7 @@ import { Game } from '../types/Game';
 import { CompletionStatusesMenuItem } from './CompletionStatusesMenuItem';
 import { Completion } from '../constants/Completion';
 
-export function CompletionStatusesMenu({ type, item, onClick, onCompletionChange }: { type: string, item: Game, onClick: any, onCompletionChange?: (gameId: number, completion: string) => void }) {
+export function CompletionStatusesMenu({ item, onClick, onCompletionChange }: { item: Game, onClick: any, onCompletionChange?: (gameId: number, completion: string) => void }) {
     const completionStatuses = [
         Completion.NOT_STARTED,
         Completion.PLAYING,
@@ -23,7 +23,6 @@ export function CompletionStatusesMenu({ type, item, onClick, onCompletionChange
                 .map((completionStatus) => (
                     <CompletionStatusesMenuItem
                         key={completionStatus}
-                        type={type}
                         item={item}
                         onClick={onClick}
                         onCompletionChange={onCompletionChange}

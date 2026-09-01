@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { View } from '../components/Themed';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { collection, getDocs } from 'firebase/firestore/lite';
-import { firestore } from '../firebaseConfig';
+import { where } from 'firebase/firestore/lite';
+import { getLibraryEntries } from '../services/LibraryService';
 import { SortProperty } from '../constants/SortProperty';
 import { ActiveFilters, FilterGroup, GameFilter, applyGameFilters, filterGroups, filterMetadata } from '../constants/GameFilter';
 import { Game } from '../types/Game';
@@ -85,15 +85,7 @@ export default function FullListScreen() {
         }));
     }, [updateGames]);
 
-    const getAllTheGames = async (): Promise<Game[]> => {
-        const fullGamesList = collection(firestore, 'full-games-list');
-        const fullGamesListSnapshot = await getDocs(fullGamesList);
-        return fullGamesListSnapshot.docs.map(doc => {
-            const documentId = doc.id;
-            const data = doc.data();
-            return { ...data, documentId, isMenuOpen: false } as Game;
-        });
-    };
+    const getAllTheGames = async (): Promise<Game[]> => getLibraryEntries(where('list', '==', 'BACKLOG'));
 
     const getFullListOfGames = useCallback(async () => {
         try {

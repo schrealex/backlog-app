@@ -4,13 +4,13 @@ import { Text } from './Themed';
 import { useState } from 'react';
 import { updateGameFields } from '../services/GameUpdateService';
 
-export function CompletionStatusesMenuItem({ type, item, completionStatus, onClick, onCompletionChange }: { type: string, item: any, completionStatus: string, onClick: any, onCompletionChange?: (gameId: number, completion: string) => void }) {
+export function CompletionStatusesMenuItem({ item, completionStatus, onClick, onCompletionChange }: { item: any, completionStatus: string, onClick: any, onCompletionChange?: (gameId: number, completion: string) => void }) {
 
     const [ isPressed, setIsPressed ] = useState(false);
 
 
     const changeStatus = (status: string): void => {
-        void updateGameFields(type, item.documentId, { completion: status });
+        void updateGameFields(item.documentId, { completion: status });
 
         if (onCompletionChange) {
             // De lijst wordt via de state bijgewerkt; dat sluit ook het menu.
