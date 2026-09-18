@@ -124,14 +124,22 @@ export default function BaseBacklogScreen({ screenType }: RootTabScreenProps<'Ba
     }, [setScreenData]);
 
     const onCompletionChange = useCallback((gameId: number, completion: string) => {
-        updateBacklogItems((currentGames) => currentGames.map((game) => {
-            if (game.id === gameId) {
-                return { ...game, completion, isMenuOpen: false };
-            }
+        // De Backlog-lijst is server-side al gefilterd op actieve statussen (zie
+        // getBacklogCoreData); zonder deze check bleef een naar Beaten/Completed
+        // gewijzigd item lokaal zichtbaar tot de volgende refresh.
+        const completionStatuses = completionStatusesByScreenType[screenType];
+        const isNowOutOfScope = Boolean(completionStatuses) && !completionStatuses!.includes(completion);
 
-            return game.isMenuOpen ? { ...game, isMenuOpen: false } : game;
-        }), true);
-    }, [updateBacklogItems]);
+        updateBacklogItems((currentGames) => currentGames
+            .map((game) => {
+                if (game.id === gameId) {
+                    return { ...game, completion, isMenuOpen: false };
+                }
+
+                return game.isMenuOpen ? { ...game, isMenuOpen: false } : game;
+            })
+            .filter((game) => !(isNowOutOfScope && game.id === gameId)), true);
+    }, [updateBacklogItems, screenType]);
 
     const onTogglePin = useCallback((gameId: number) => {
         const { games, isPinned, hasChanges, limitReached } = togglePinnedGame(
