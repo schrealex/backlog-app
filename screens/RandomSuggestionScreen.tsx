@@ -7,6 +7,7 @@ import ListItem from '../components/ListItem';
 import { Cache } from '../interfaces/Cache';
 import { Game } from '../types/Game';
 import { getHLTBInformation } from '../services/InformationService';
+import { GAME_INFORMATION_BASE_URL } from '../constants/Constants';
 
 export default function RandomSuggestionScreen() {
     const [isLoading, setIsLoading] = useState(true);
@@ -29,7 +30,7 @@ export default function RandomSuggestionScreen() {
             return getRandomBacklogSuggestion.cache['random'];
         }
 
-        const randomBacklogSuggestionURL = `https://game-information.vercel.app/random`;
+        const randomBacklogSuggestionURL = `${GAME_INFORMATION_BASE_URL}random`;
         const randomSuggestion = await fetch(randomBacklogSuggestionURL);
 
         if (!randomSuggestion) {
@@ -37,7 +38,7 @@ export default function RandomSuggestionScreen() {
             setIsLoading(false);
         }
         const game = await randomSuggestion.json() as Game;
-        game.hltbInfo = await getHLTBInformation(game.title);
+        game.hltbInfo = await getHLTBInformation(game.title, game.id);
 
         getRandomBacklogSuggestion.cache['random'] = game;
 

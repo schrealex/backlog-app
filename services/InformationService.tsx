@@ -4,9 +4,10 @@ import { HLTBInfo } from '../types/HLTBInfo';
 import { MetacriticInfo } from '../types/MetacriticInfo';
 import { GAME_INFORMATION_BASE_URL } from '../constants/Constants';
 
-const fetchInformation = async (title: string, endpoint: string) => {
+const fetchInformation = async (title: string, endpoint: string, extraParams: Record<string, string> = {}) => {
     const filteredTitle = filterCharacters(title);
-    const url = `${GAME_INFORMATION_BASE_URL}${endpoint}?title=${encodeURIComponent(filteredTitle)}`;
+    const params = new URLSearchParams({ title: filteredTitle, ...extraParams });
+    const url = `${GAME_INFORMATION_BASE_URL}${endpoint}?${params.toString()}`;
     try {
         const response = await fetch(url);
         if (!response.ok) {
@@ -20,13 +21,15 @@ const fetchInformation = async (title: string, endpoint: string) => {
     }
 };
 
-const getHLTBInformation = async (title: string): Promise<HLTBInfo | undefined> => {
+const getHLTBInformation = async (title: string, gameId?: number): Promise<HLTBInfo | undefined> => {
     if (getHLTBInformation.cache[title]) {
         return getHLTBInformation.cache[title];
     }
 
     const filteredTitle = filterCharacters(title);
-    const response = await fetchInformation(filteredTitle, 'how-long-to-beat');
+    // gameId laat de backend de permanente cache op het games-document gebruiken
+    // i.p.v. elke keer een trage live lookup te doen.
+    const response = await fetchInformation(filteredTitle, 'how-long-to-beat', gameId ? { gameId: String(gameId) } : {});
 
     let result: HLTBInfo | undefined;
     if (response && response.name !== 'TimeoutError') {
