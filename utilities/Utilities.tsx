@@ -10,6 +10,7 @@ const filterCharacters = (title: string): string => {
         ': Bundle of Terror',
         ': Legacy',
         ' — Complete Edition',
+        ' – Nintendo Switch 2 Edition',
     ];
 
     let filteredTitle = title;
@@ -32,6 +33,17 @@ const sortByHLTB = (list: any, sortAscending: boolean) => {
             return sortAscending ? aMain - bMain : bMain - aMain;
         }
         return aMain ? -1 : 1;
+    });
+};
+
+const sortByLastPlayed = (list: any, sortAscending: boolean) => {
+    return [...list].sort((a: any, b: any) => {
+        const aLastPlayed = a.exophaseInfo?.lastPlayedUtc;
+        const bLastPlayed = b.exophaseInfo?.lastPlayedUtc;
+        if (aLastPlayed && bLastPlayed) {
+            return sortAscending ? aLastPlayed - bLastPlayed : bLastPlayed - aLastPlayed;
+        }
+        return aLastPlayed ? -1 : 1;
     });
 };
 
@@ -153,4 +165,4 @@ const togglePinnedGame = <T extends { id: number, isPinned?: boolean }>(games: T
     };
 };
 
-export { filterCharacters, sortAlphabetical, sortByHLTB, getGameImageUri, getImagePrefetchUris, mergeGameInformation, countPinnedGames, sortPinnedFirst, togglePinnedGame }
+export { filterCharacters, sortAlphabetical, sortByHLTB, sortByLastPlayed, getGameImageUri, getImagePrefetchUris, mergeGameInformation, countPinnedGames, sortPinnedFirst, togglePinnedGame }

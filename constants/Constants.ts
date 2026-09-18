@@ -1,6 +1,10 @@
 export const GAME_INFORMATION_BASE_URL = 'https://game-information-api.vercel.app/';
 // export const GAME_INFORMATION_BASE_URL = 'http://localhost:3000/';
 
+// Onofficiële publieke JSON-API die Exophase's eigen frontend gebruikt (geen API-key nodig).
+export const EXOPHASE_API_BASE_URL = 'https://api.exophase.com/public/';
+export const EXOPHASE_PLAYER_ID = '4490348';
+
 // Maximaal aantal games dat tegelijk bovenaan de backlog gepind mag staan.
 export const MAX_PINNED_GAMES = 5;
 

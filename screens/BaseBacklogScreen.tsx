@@ -13,7 +13,7 @@ import { ListItemView } from '../components/ListItemView';
 import ButtonGroup from '../components/ButtonGroup';
 import SortMenu from '../components/SortMenu';
 import { GAME_INFORMATION_BASE_URL, MAX_PINNED_GAMES } from '../constants/Constants';
-import { countPinnedGames, mergeGameInformation, sortAlphabetical, sortByHLTB, sortPinnedFirst, togglePinnedGame } from '../utilities/Utilities';
+import { countPinnedGames, mergeGameInformation, sortAlphabetical, sortByHLTB, sortByLastPlayed, sortPinnedFirst, togglePinnedGame } from '../utilities/Utilities';
 import { loadBacklogFromStorage, saveBacklogToStorage } from '../services/BacklogCacheService';
 import { updateGameFields } from '../services/GameUpdateService';
 import { getLibraryEntries } from '../services/LibraryService';
@@ -43,6 +43,7 @@ const listTypeByScreenType: Record<BacklogScreenType, string> = {
 const sortFunctions = {
     [SortProperty.ALPHABETICAL]: sortAlphabetical,
     [SortProperty.HLTB]: sortByHLTB,
+    [SortProperty.LAST_PLAYED]: sortByLastPlayed,
 };
 
 // De verrijking draait volledig op de achtergrond en blokkeert de UI niet, dus mag hij

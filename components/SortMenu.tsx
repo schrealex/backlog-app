@@ -11,9 +11,10 @@ type SortPropertyMeta = { icon: string, label: string };
 const sortPropertyMeta: Record<SortProperty, SortPropertyMeta> = {
     [SortProperty.ALPHABETICAL]: { icon: 'font', label: 'Alphabetical' },
     [SortProperty.HLTB]: { icon: 'hourglass-half', label: 'HLTB' },
+    [SortProperty.LAST_PLAYED]: { icon: 'calendar-alt', label: 'Last Played' },
 };
 
-const DEFAULT_SORT_PROPERTIES = [SortProperty.ALPHABETICAL, SortProperty.HLTB];
+const DEFAULT_SORT_PROPERTIES = [SortProperty.ALPHABETICAL, SortProperty.HLTB, SortProperty.LAST_PLAYED];
 
 export function SortMenu({ sortBy, sortAscending, setSortBy, setSortAscending, sortProperties = DEFAULT_SORT_PROPERTIES }: {
     sortBy: SortProperty,
@@ -42,7 +43,9 @@ export function SortMenu({ sortBy, sortAscending, setSortBy, setSortAscending, s
     // 'A-Z' zegt bij een alfabetische sortering meer dan een kale pijl.
     const directionLabel = sortBy === SortProperty.ALPHABETICAL
         ? (sortAscending ? 'A-Z' : 'Z-A')
-        : (sortAscending ? 'Short' : 'Long');
+        : sortBy === SortProperty.LAST_PLAYED
+            ? (sortAscending ? 'Oldest' : 'Recent')
+            : (sortAscending ? 'Short' : 'Long');
 
     return (
         <View style={styles.container}>

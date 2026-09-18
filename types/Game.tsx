@@ -1,6 +1,7 @@
 import { HLTBInfo } from './HLTBInfo';
 import { MetacriticInfo } from './MetacriticInfo';
 import { MultiplayerInfo } from './MultiplayerInfo';
+import { ExophaseInfo } from './ExophaseInfo';
 
 export type Game = {
     isMenuOpen: boolean;
@@ -16,4 +17,5 @@ export type Game = {
     hltbInfo?: HLTBInfo;
     metacriticInfo?: MetacriticInfo;
     multiplayerInfo?: MultiplayerInfo;
+    exophaseInfo?: ExophaseInfo;
 }

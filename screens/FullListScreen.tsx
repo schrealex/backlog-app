@@ -13,10 +13,15 @@ import { LoadingIndicator } from '../components/LoadingIndicator';
 import { FilterButton } from '../components/FilterButton';
 import FilterMenu, { FilterMenuGroup } from '../components/FilterMenu';
 import { ListItemView } from '../components/ListItemView';
-import { sortAlphabetical } from '../utilities/Utilities';
+import { sortAlphabetical, sortByLastPlayed } from '../utilities/Utilities';
 
 // Bezit gebruik je het vaakst en blijft daarom als knoppenrij zichtbaar.
 const copyFilters = filterGroups.copy;
+
+const sortFunctions: Partial<Record<SortProperty, (games: Game[], sortAscending: boolean) => Game[]>> = {
+    [SortProperty.ALPHABETICAL]: sortAlphabetical,
+    [SortProperty.LAST_PLAYED]: sortByLastPlayed,
+};
 
 // Status en samen spelen zitten achter het filtermenu; dat scheelt twee rijen knoppen.
 const menuGroups: FilterMenuGroup[] = [
@@ -36,10 +41,11 @@ export default function FullListScreen() {
     const fullListRef = useRef<Game[]>([]);
 
     // Afgeleide lijst: blijft automatisch in sync als een completion-status wijzigt.
-    const fullListData = useMemo(
-        () => sortAlphabetical(applyGameFilters(fullList, activeFilters), sortAscending),
-        [fullList, activeFilters, sortAscending]
-    );
+    const fullListData = useMemo(() => {
+        const filteredGames = applyGameFilters(fullList, activeFilters);
+        const sortFunction = sortFunctions[sortBy] ?? sortAlphabetical;
+        return sortFunction(filteredGames, sortAscending);
+    }, [fullList, activeFilters, sortBy, sortAscending]);
 
     /**
      * Tellingen zijn contextueel: ze laten zien hoeveel games je overhoudt als je
@@ -120,13 +126,12 @@ export default function FullListScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Dit scherm sorteert alleen alfabetisch, dus tonen we geen keuzemenu. */}
             <SortMenu
-                sortBy={SortProperty.ALPHABETICAL}
+                sortBy={sortBy}
                 sortAscending={sortAscending}
                 setSortBy={setSortBy}
                 setSortAscending={setSortAscending}
-                sortProperties={[SortProperty.ALPHABETICAL]}
+                sortProperties={[SortProperty.ALPHABETICAL, SortProperty.LAST_PLAYED]}
             />
             <View style={styles.buttonGroup}>
                 <FilterButton

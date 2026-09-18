@@ -6,6 +6,7 @@ import { CoopElement } from './CoopElement';
 import { CompletionElement } from './CompletionElement';
 import { CompletionStatusesMenu } from './CompletionStatusesMenu';
 import { HLTBElement } from './HLTBElement';
+import { ExophaseElement } from './ExophaseElement';
 import { GameImageAndMetacritic } from './GameImageAndMetacritic';
 import { PinElement } from './PinElement';
 import { Game } from '../types/Game';
@@ -35,6 +36,7 @@ const ListItem = React.memo(({ item, type, isOpen, onClick, onCompletionChange, 
                         <CoopElement multiplayerInfo={item.multiplayerInfo} />
                     </View>
                     { (type === 'BACKLOG' || type === 'RETRO_BACKLOG') && <HLTBElement item={item} /> }
+                    <ExophaseElement item={item} />
                 </View>
             </View>
         </Pressable>
